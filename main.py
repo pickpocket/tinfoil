@@ -6,11 +6,14 @@ import logging
 from mutagen.flac import FLAC
 import difflib
 
-from cogs.acoustid_cog import AcoustIDCog
-from cogs.metadata_cog import MetadataCog
-from cogs.cover_art_cog import CoverArtCog
-from cogs.file_structure_cog import FileStructureCog
+from cogs.acoustid_api import AcoustIDCog
+from cogs.metadata import MetadataCog
+from cogs.cover_art import CoverArtCog
+
+
 from utils.logging_utils import setup_logging
+from utils.file_structure import *
+
 
 class FlacParser:
     def __init__(
@@ -27,7 +30,7 @@ class FlacParser:
         self.acoustid_cog = AcoustIDCog(api_key, fpcalc_path, self.logger)
         self.metadata_cog = MetadataCog(self.logger)
         self.cover_art_cog = CoverArtCog(self.logger)
-        self.file_structure_cog = FileStructureCog(self.logger)
+
 
     def get_existing_metadata(self, file_path: Path) -> Dict[str, str]:
         """Extract existing metadata from FLAC file.
@@ -302,7 +305,7 @@ class FlacParser:
             cover_art = self.cover_art_cog.get_cover_art_data(album_release['id'])
             
             # Create output directory structure
-            output_path = self.file_structure_cog.setup_directory_structure(
+            output_path = setup_directory_structure(
                 output_dir,
                 metadata['artist'],
                 metadata['album'],
@@ -310,7 +313,7 @@ class FlacParser:
             )
             
             # Create new file path
-            new_file_path = self.file_structure_cog.create_file_path(
+            new_file_path = create_file_path(
                 output_path,
                 metadata['artist'],
                 metadata['album'],
@@ -319,11 +322,11 @@ class FlacParser:
             )
             
             # Copy file
-            if not self.file_structure_cog.copy_file(input_file, new_file_path):
+            if not copy_file(input_file, new_file_path):
                 return False
                 
             # Update metadata
-            success = self.file_structure_cog.update_flac_metadata(
+            success = update_flac_metadata(
                 new_file_path,
                 metadata,
                 cover_art
@@ -359,14 +362,14 @@ class FlacParser:
             
             output_path.mkdir(parents=True, exist_ok=True)
             
-            flac_files = self.file_structure_cog.get_flac_files(input_path)
+            flac_files = get_flac_files(input_path)
             self.logger.info(f"Found {len(flac_files)} FLAC files to process")
             
             for flac_file in flac_files:
                 if not self.process_single_file(flac_file, output_path, force_update):
                     self.logger.warning(f"Failed to process {flac_file}")
                     
-            self.file_structure_cog.clean_directory(output_path)
+            clean_directory(output_path)
             
         except Exception as e:
             self.logger.error(f"Error processing directory: {e}")
