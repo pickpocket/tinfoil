@@ -4,7 +4,7 @@ import json
 from typing import Optional, Tuple, Dict, Any
 import logging
 from pathlib import Path
-from config import Config
+from old_code.config import Config
 
 class AcoustIDCog:
     """Handle acoustic fingerprinting and AcoustID API interactions."""

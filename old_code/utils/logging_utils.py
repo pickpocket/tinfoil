@@ -1,6 +1,6 @@
 import logging
 from typing import Optional
-from config import Config
+from old_code.config import Config
 
 def setup_logging(verbose: bool = False, log_file: Optional[str] = None) -> logging.Logger:
     """Configure logging settings with optional file output.

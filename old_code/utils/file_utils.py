@@ -1,6 +1,6 @@
 from pathlib import Path
 from typing import List
-from config import Config
+from old_code.config import Config
 
 def sanitize_filename(name: str) -> str:
     """Clean and sanitize a filename to be safe for all filesystems.

@@ -1,7 +1,7 @@
 import musicbrainzngs
 from typing import Optional, Dict, Any, List, Tuple
 import logging
-from config import Config
+from old_code.config import Config
 import json
 
 class MetadataCog:
