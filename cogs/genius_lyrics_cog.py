@@ -1,9 +1,10 @@
 """
 @file genius_lyrics_cog.py
-@brief Cog for fetching lyrics from Genius using direct search.
+@brief Cog for fetching lyrics from Genius using their search API and web scraping.
 """
 import logging
 import requests
+import json
 from bs4 import BeautifulSoup
 from typing import Optional, Dict, Any, List
 import traceback
@@ -16,7 +17,7 @@ from config import Config
 
 
 class GeniusLyricsCog(BaseCog):
-    """Handle fetching lyrics from Genius using web scraping."""
+    """Handle fetching lyrics from Genius using their search API and web scraping."""
     
     def __init__(self, logger: Optional[logging.Logger] = None):
         """Initialize GeniusLyricsCog.
@@ -26,10 +27,17 @@ class GeniusLyricsCog(BaseCog):
         """
         super().__init__(logger)
         self.base_url = "https://genius.com"
-        self.search_url = "https://genius.com/search"
-        # Standard user agent to avoid being blocked
+        self.search_url = "https://genius.com/api/search/multi"
+        # Modern Firefox user agent
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-origin',
+            'Sec-GPC': '1'
         }
     
     def process(self, song: Song) -> bool:
@@ -71,6 +79,10 @@ class GeniusLyricsCog(BaseCog):
                 self.logger.warning(f"Could not find song on Genius: {artist} - {title}")
                 return False
             
+            # Debug log the lyrics content
+            self.logger.debug(f"Found lyrics (first 100 chars): {lyrics[:100]}...")
+            self.logger.debug(f"Lyrics length: {len(lyrics)} characters")
+            
             # Update metadata
             song.all_metadata['lyrics'] = lyrics
             self.logger.info(f"Successfully added Genius lyrics for {song.filepath}")
@@ -93,38 +105,103 @@ class GeniusLyricsCog(BaseCog):
         try:
             # Encode the search term
             search_term = urllib.parse.quote(title)
-            search_url = f"{self.search_url}?q={search_term}"
             
-            self.logger.debug(f"Searching Genius with title only: {search_url}")
+            # Set up the API endpoint with query
+            api_url = f"{self.search_url}?per_page=5&q={search_term}"
             
-            # Get the search results page
-            response = requests.get(search_url, headers=self.headers)
+            # Set up the referrer for the API request
+            referrer = f"{self.base_url}/search?q={search_term}"
+            headers = self.headers.copy()
+            headers['Referer'] = referrer
+            
+            self.logger.debug(f"Searching Genius API with title only: {api_url}")
+            
+            # Get search results from the API
+            response = requests.get(
+                api_url, 
+                headers=headers
+            )
             response.raise_for_status()
             
-            # Parse the HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # Parse the JSON response
+            search_data = response.json()
             
-            # Log a sample of the HTML for debugging
-            self.logger.debug(f"Search response length: {len(response.text)} bytes")
+            # Extract song URLs from the API response
+            song_urls = self._extract_song_urls_from_api(search_data)
             
-            # Find song links in search results
-            song_links = self._extract_song_links_from_search(soup)
-            
-            if not song_links:
-                self.logger.debug("No song links found in search results")
+            if not song_urls:
+                self.logger.debug("No song URLs found in API response")
                 return None
             
             # Try the first result
-            first_link = song_links[0]['url']
-            self.logger.debug(f"Found song link: {first_link}")
+            first_url = song_urls[0]
+            self.logger.debug(f"Found song URL: {first_url}")
             
             # Get the lyrics
-            lyrics = self._scrape_lyrics_from_url(first_link)
+            lyrics = self._scrape_lyrics_from_url(first_url)
+            
+            # Debug log for lyrics content
+            if lyrics:
+                self.logger.debug(f"Fetched lyrics of length {len(lyrics)} from {first_url}")
+            else:
+                self.logger.debug(f"No lyrics found at {first_url}")
+                
             return lyrics
             
         except Exception as e:
             self.logger.error(f"Error searching Genius by title: {e}")
             return None
+    
+    def _extract_song_urls_from_api(self, search_data: Dict) -> List[str]:
+        """Extract song URLs from the Genius API response.
+        
+        Args:
+            search_data: JSON data from the API
+            
+        Returns:
+            List[str]: List of song URLs
+        """
+        song_urls = []
+        
+        try:
+            # Check if the response has the expected structure
+            if 'response' not in search_data or 'sections' not in search_data['response']:
+                self.logger.warning("Unexpected API response structure")
+                self.logger.debug(f"API response keys: {search_data.keys()}")
+                return []
+            
+            # Process top hit section first
+            sections = search_data['response']['sections']
+            
+            # Look for top hit section
+            top_hit_section = next((s for s in sections if s['type'] == 'top_hit'), None)
+            if top_hit_section and 'hits' in top_hit_section and top_hit_section['hits']:
+                for hit in top_hit_section['hits']:
+                    if hit.get('type') == 'song' and 'result' in hit and 'url' in hit['result']:
+                        song_urls.append(hit['result']['url'])
+            
+            # Look for songs section
+            song_section = next((s for s in sections if s['type'] == 'song'), None)
+            if song_section and 'hits' in song_section:
+                for hit in song_section['hits']:
+                    if 'result' in hit and 'url' in hit['result']:
+                        song_urls.append(hit['result']['url'])
+            
+            # Look for lyric section
+            lyric_section = next((s for s in sections if s['type'] == 'lyric'), None)
+            if lyric_section and 'hits' in lyric_section:
+                for hit in lyric_section['hits']:
+                    if hit.get('type') == 'song' and 'result' in hit and 'url' in hit['result']:
+                        song_urls.append(hit['result']['url'])
+            
+            self.logger.debug(f"Found {len(song_urls)} song URLs in API response")
+            if song_urls:
+                self.logger.debug(f"First URL: {song_urls[0]}")
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting song URLs from API response: {e}")
+        
+        return song_urls
     
     def get_lyrics_by_combined(self, artist: str, title: str) -> Optional[str]:
         """Search for lyrics using artist and title.
@@ -139,29 +216,47 @@ class GeniusLyricsCog(BaseCog):
         try:
             # Encode the search term
             search_term = urllib.parse.quote(f"{artist} {title}")
-            search_url = f"{self.search_url}?q={search_term}"
             
-            self.logger.debug(f"Searching Genius with artist and title: {search_url}")
+            # Set up the API endpoint with query
+            api_url = f"{self.search_url}?per_page=5&q={search_term}"
             
-            # Get the search results page
-            response = requests.get(search_url, headers=self.headers)
+            # Set up the referrer for the API request
+            referrer = f"{self.base_url}/search?q={search_term}"
+            headers = self.headers.copy()
+            headers['Referer'] = referrer
+            
+            self.logger.debug(f"Searching Genius API with artist and title: {api_url}")
+            
+            # Get search results from the API
+            response = requests.get(
+                api_url, 
+                headers=headers
+            )
             response.raise_for_status()
             
-            # Parse the HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # Parse the JSON response
+            search_data = response.json()
             
-            # Find song links in search results
-            song_links = self._extract_song_links_from_search(soup)
+            # Extract song URLs from the API response
+            song_urls = self._extract_song_urls_from_api(search_data)
             
-            if not song_links:
+            if not song_urls:
+                self.logger.debug("No song URLs found in API response")
                 return None
             
             # Try the first result
-            first_link = song_links[0]['url']
-            self.logger.debug(f"Found song link: {first_link}")
+            first_url = song_urls[0]
+            self.logger.debug(f"Found song URL: {first_url}")
             
             # Get the lyrics
-            lyrics = self._scrape_lyrics_from_url(first_link)
+            lyrics = self._scrape_lyrics_from_url(first_url)
+            
+            # Debug log for lyrics content
+            if lyrics:
+                self.logger.debug(f"Fetched lyrics of length {len(lyrics)} from {first_url}")
+            else:
+                self.logger.debug(f"No lyrics found at {first_url}")
+                
             return lyrics
             
         except Exception as e:
@@ -180,194 +275,52 @@ class GeniusLyricsCog(BaseCog):
         try:
             # Encode the search term
             search_term = urllib.parse.quote(artist)
-            search_url = f"{self.search_url}?q={search_term}"
             
-            self.logger.debug(f"Searching Genius with artist only: {search_url}")
+            # Set up the API endpoint with query
+            api_url = f"{self.search_url}?per_page=5&q={search_term}"
             
-            # Get the search results page
-            response = requests.get(search_url, headers=self.headers)
+            # Set up the referrer for the API request
+            referrer = f"{self.base_url}/search?q={search_term}"
+            headers = self.headers.copy()
+            headers['Referer'] = referrer
+            
+            self.logger.debug(f"Searching Genius API with artist only: {api_url}")
+            
+            # Get search results from the API
+            response = requests.get(
+                api_url, 
+                headers=headers
+            )
             response.raise_for_status()
             
-            # Parse the HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # Parse the JSON response
+            search_data = response.json()
             
-            # Find song links in search results
-            song_links = self._extract_song_links_from_search(soup)
+            # Extract song URLs from the API response
+            song_urls = self._extract_song_urls_from_api(search_data)
             
-            if not song_links:
+            if not song_urls:
+                self.logger.debug("No song URLs found in API response")
                 return None
             
             # Try the first result
-            first_link = song_links[0]['url']
-            self.logger.debug(f"Found song link: {first_link}")
+            first_url = song_urls[0]
+            self.logger.debug(f"Found song URL: {first_url}")
             
             # Get the lyrics
-            lyrics = self._scrape_lyrics_from_url(first_link)
+            lyrics = self._scrape_lyrics_from_url(first_url)
+            
+            # Debug log for lyrics content
+            if lyrics:
+                self.logger.debug(f"Fetched lyrics of length {len(lyrics)} from {first_url}")
+            else:
+                self.logger.debug(f"No lyrics found at {first_url}")
+                
             return lyrics
             
         except Exception as e:
             self.logger.error(f"Error searching Genius by artist: {e}")
             return None
-    
-    def _extract_song_links_from_search(self, soup: BeautifulSoup) -> List[Dict[str, str]]:
-        """Extract song links from a search results page.
-        
-        Args:
-            soup: BeautifulSoup object of the search page
-            
-        Returns:
-            List[Dict[str, str]]: List of song info dictionaries
-        """
-        results = []
-        
-        # IMPORTANT: The selectors have been updated to match 2025 Genius search page structure
-        # Method 1: Try to find hits in the search results (2024-2025 layout)
-        hits = soup.select('div.hit_full')
-        if hits:
-            self.logger.debug(f"Found {len(hits)} search result hits")
-            for hit in hits:
-                # Look for song link
-                link = hit.select_one('a.mini_card')
-                if not link:
-                    link = hit.select_one('a')
-                
-                if link:
-                    url = link.get('href')
-                    # Try to get title from different possible elements
-                    title_elem = hit.select_one('.mini_card-title')
-                    if not title_elem:
-                        title_elem = hit.select_one('.title') or hit.select_one('.name')
-                    
-                    # Try to get artist from different possible elements
-                    artist_elem = hit.select_one('.mini_card-subtitle')
-                    if not artist_elem:
-                        artist_elem = hit.select_one('.subtitle') or hit.select_one('.artist')
-                    
-                    title = title_elem.get_text().strip() if title_elem else ""
-                    artist = artist_elem.get_text().strip() if artist_elem else ""
-                    
-                    if url and (title or url.endswith('-lyrics')):
-                        results.append({
-                            'url': url,
-                            'title': title,
-                            'artist': artist
-                        })
-        
-        # Method 2: Current version (2023-2025)
-        if not results:
-            cards = soup.select('div.mini_card')
-            if cards:
-                self.logger.debug(f"Found {len(cards)} mini cards")
-                for card in cards:
-                    link = card.find('a')
-                    title_elem = card.select_one('.mini_card-title')
-                    artist_elem = card.select_one('.mini_card-subtitle')
-                    
-                    if link:
-                        url = link.get('href')
-                        title = title_elem.get_text().strip() if title_elem else ""
-                        artist = artist_elem.get_text().strip() if artist_elem else ""
-                        
-                        if url:
-                            results.append({
-                                'url': url,
-                                'title': title,
-                                'artist': artist
-                            })
-        
-        # Method 3: Try looking for any links to lyrics pages
-        if not results:
-            # Look for any links containing "/lyrics/" or ending with "-lyrics"
-            lyric_links = soup.select('a[href*="/lyrics/"], a[href$="-lyrics"]')
-            self.logger.debug(f"Found {len(lyric_links)} potential lyric links")
-            
-            for link in lyric_links:
-                url = link.get('href')
-                # Make sure the URL is to a song lyrics page
-                if url and ('/lyrics/' in url or url.endswith('-lyrics')):
-                    # Try to extract title and artist from the URL
-                    parts = url.split('/')
-                    if len(parts) > 1:
-                        filename = parts[-1]
-                        # Remove -lyrics suffix if present
-                        if filename.endswith('-lyrics'):
-                            filename = filename[:-7]
-                        # Replace hyphens with spaces
-                        title = filename.replace('-', ' ').title()
-                    else:
-                        title = link.get_text().strip()
-                    
-                    results.append({
-                        'url': url,
-                        'title': title or "Unknown Title",
-                        'artist': ""
-                    })
-        
-        # Method 4: Alternative selectors for different page versions
-        if not results:
-            song_rows = soup.select('div.search_results a.search_result_title')
-            if song_rows:
-                self.logger.debug(f"Found {len(song_rows)} song rows")
-                for row in song_rows:
-                    url = row.get('href')
-                    title = row.get_text().strip()
-                    
-                    if url and title:
-                        results.append({
-                            'url': url,
-                            'title': title,
-                            'artist': ""
-                        })
-        
-        # Method 5: Last resort - find anything that looks like a song link
-        if not results:
-            # Get all links on the page
-            all_links = soup.find_all('a')
-            self.logger.debug(f"Found {len(all_links)} total links, scanning for lyrics URLs")
-            
-            for link in all_links:
-                url = link.get('href')
-                text = link.get_text().strip()
-                
-                # Check if the URL contains "/lyrics/" or ends with "-lyrics"
-                if url and ('lyrics' in url.lower() or 'song' in url.lower()):
-                    results.append({
-                        'url': url,
-                        'title': text or "Unknown Title",
-                        'artist': ""
-                    })
-        
-        # Method 6: Absolute last resort - try to detect any music-related URLs
-        if not results:
-            all_links = soup.find_all('a', href=True)
-            
-            for link in all_links:
-                url = link.get('href')
-                text = link.get_text().strip()
-                
-                # If it's likely a Genius song URL, add it
-                if url and url.startswith(('https://genius.com/', '/')) and not url.startswith(('/search', '/api', '/static')):
-                    results.append({
-                        'url': url,
-                        'title': text or "Unknown Title",
-                        'artist': ""
-                    })
-        
-        # Filter results to ensure we're only including song links
-        filtered_results = []
-        for result in results:
-            url = result['url']
-            # Make URL absolute if it's relative
-            if url.startswith('/'):
-                url = f"https://genius.com{url}"
-                result['url'] = url
-            
-            # Verify it's a lyrics URL
-            if 'genius.com' in url and not '/search?' in url:
-                filtered_results.append(result)
-        
-        self.logger.debug(f"Found {len(filtered_results)} filtered song links")
-        return filtered_results
     
     def _scrape_lyrics_from_url(self, url: str) -> Optional[str]:
         """Scrape lyrics from Genius URL.
@@ -388,6 +341,10 @@ class GeniusLyricsCog(BaseCog):
             response = requests.get(url, headers=self.headers)
             response.raise_for_status()
             
+            # Log response details
+            self.logger.debug(f"Response status code: {response.status_code}")
+            self.logger.debug(f"Response content length: {len(response.text)} bytes")
+            
             # Parse the HTML with BeautifulSoup
             soup = BeautifulSoup(response.text, 'html.parser')
             
@@ -401,11 +358,10 @@ class GeniusLyricsCog(BaseCog):
                 return None
             
             # Try to find lyrics in different possible containers
-            lyrics_container = None
-            
             # Method 1: New versions (2020+)
             lyrics_containers = soup.select('[data-lyrics-container="true"]')
             if lyrics_containers:
+                self.logger.debug(f"Found {len(lyrics_containers)} lyrics containers with [data-lyrics-container='true']")
                 lyrics_text = ""
                 for container in lyrics_containers:
                     # Process the lyrics container
@@ -413,57 +369,111 @@ class GeniusLyricsCog(BaseCog):
                     for br in container.find_all('br'):
                         br.replace_with('\n')
                     
-                    lyrics_text += container.get_text() + "\n\n"
+                    container_text = container.get_text()
+                    lyrics_text += container_text + "\n\n"
+                    self.logger.debug(f"Container text length: {len(container_text)} chars")
                 
                 if lyrics_text.strip():
-                    return self._clean_lyrics(lyrics_text)
+                    cleaned_lyrics = self._clean_lyrics(lyrics_text)
+                    self.logger.debug(f"Found lyrics using method 1, length: {len(cleaned_lyrics)}")
+                    return cleaned_lyrics
             
             # Method 2: Classic version with class="lyrics"
             lyrics_div = soup.find('div', class_='lyrics')
             if lyrics_div:
                 lyrics = lyrics_div.get_text()
                 if lyrics.strip():
-                    return self._clean_lyrics(lyrics)
+                    cleaned_lyrics = self._clean_lyrics(lyrics)
+                    self.logger.debug(f"Found lyrics using method 2, length: {len(cleaned_lyrics)}")
+                    return cleaned_lyrics
             
             # Method 3: Try by ID
             lyrics_div = soup.find(id='lyrics-root')
             if lyrics_div:
                 lyrics = lyrics_div.get_text()
                 if lyrics.strip():
-                    return self._clean_lyrics(lyrics)
+                    cleaned_lyrics = self._clean_lyrics(lyrics)
+                    self.logger.debug(f"Found lyrics using method 3, length: {len(cleaned_lyrics)}")
+                    return cleaned_lyrics
             
             # Method 4: Try the 2023-2025 format with Lyrics__Container
             lyrics_div = soup.select('.Lyrics__Container')
             if lyrics_div:
+                self.logger.debug(f"Found {len(lyrics_div)} .Lyrics__Container elements")
                 lyrics_text = ""
                 for div in lyrics_div:
                     # Convert <br> tags to newlines
                     for br in div.find_all('br'):
                         br.replace_with('\n')
-                    lyrics_text += div.get_text() + "\n\n"
+                    div_text = div.get_text()
+                    lyrics_text += div_text + "\n\n"
+                    self.logger.debug(f"Container text length: {len(div_text)} chars")
                 
                 if lyrics_text.strip():
-                    return self._clean_lyrics(lyrics_text)
+                    cleaned_lyrics = self._clean_lyrics(lyrics_text)
+                    self.logger.debug(f"Found lyrics using method 4, length: {len(cleaned_lyrics)}")
+                    return cleaned_lyrics
             
-            # Method 5: Try all elements with 'lyrics' in their class name
+            # Method 5: Try elements with specific content
+            # Look for divs with text content that includes common lyric markers
+            for div in soup.find_all('div'):
+                div_text = div.get_text()
+                if '[Verse' in div_text or '[Chorus' in div_text or 'Lyrics' in div.get('class', ''):
+                    # Convert <br> tags to newlines
+                    for br in div.find_all('br'):
+                        br.replace_with('\n')
+                    if len(div_text.strip()) > 100:  # Only if it's substantial text
+                        cleaned_lyrics = self._clean_lyrics(div_text)
+                        self.logger.debug(f"Found lyrics using method 5, length: {len(cleaned_lyrics)}")
+                        return cleaned_lyrics
+            
+            # Method 6: Try all elements with 'lyrics' in their class name
             for element in soup.find_all(class_=lambda c: c and 'lyrics' in c.lower()):
                 lyrics = element.get_text()
                 if len(lyrics.strip()) > 100:  # Only return if it looks like actual lyrics
-                    return self._clean_lyrics(lyrics)
+                    cleaned_lyrics = self._clean_lyrics(lyrics)
+                    self.logger.debug(f"Found lyrics using method 6, length: {len(cleaned_lyrics)}")
+                    return cleaned_lyrics
             
-            # Method 6: Last resort - try to find a lyrics section by looking at the content and structure
+            # Method 7: Last resort - try to find a lyrics section by looking at the content and structure
             # Look for elements that contain a significant amount of text with line breaks
             for element in soup.find_all(['div', 'p']):
                 if len(element.find_all('br')) > 5:  # If it has several line breaks
                     text = element.get_text()
                     if len(text.strip()) > 200:  # Only if it's substantial text
-                        return self._clean_lyrics(text)
+                        cleaned_lyrics = self._clean_lyrics(text)
+                        self.logger.debug(f"Found lyrics using method 7, length: {len(cleaned_lyrics)}")
+                        return cleaned_lyrics
+            
+            # Last resort - get the title and look for containers with that same title text
+            page_title = soup.find('title')
+            if page_title:
+                title_text = page_title.get_text()
+                if " – " in title_text:
+                    song_title = title_text.split(" – ")[0]
+                    for heading in soup.find_all(['h1', 'h2']):
+                        if song_title in heading.get_text():
+                            # Try to get the next content-rich element
+                            next_element = heading.find_next(['div', 'p'])
+                            if next_element:
+                                text = next_element.get_text()
+                                if len(text.strip()) > 200:
+                                    cleaned_lyrics = self._clean_lyrics(text)
+                                    self.logger.debug(f"Found lyrics using title-based search, length: {len(cleaned_lyrics)}")
+                                    return cleaned_lyrics
+            
+            # Print the entire HTML content for debugging
+            self.logger.debug("HTML structure summary:")
+            for tag in soup.find_all(['div', 'section']):
+                if 'class' in tag.attrs:
+                    self.logger.debug(f"Found tag: {tag.name}, class: {tag['class']}")
             
             self.logger.warning(f"Could not find lyrics in the page: {url}")
             return None
             
         except Exception as e:
             self.logger.error(f"Error scraping lyrics from {url}: {e}")
+            self.logger.error(traceback.format_exc())
             return None
     
     def _clean_lyrics(self, lyrics: str) -> str:
@@ -477,6 +487,9 @@ class GeniusLyricsCog(BaseCog):
         """
         if not lyrics:
             return ""
+        
+        # Log raw lyrics for debugging
+        self.logger.debug(f"Raw lyrics sample: {lyrics[:100]}...")
         
         # Strip whitespace
         lyrics = lyrics.strip()
@@ -502,4 +515,9 @@ class GeniusLyricsCog(BaseCog):
         # Remove excessive blank lines (more than 2 in a row)
         lyrics = re.sub(r'\n{3,}', '\n\n', lyrics)
         
-        return lyrics.strip()
+        # Log cleaned lyrics for debugging
+        cleaned = lyrics.strip()
+        self.logger.debug(f"Cleaned lyrics sample: {cleaned[:100]}...")
+        self.logger.debug(f"Cleaned lyrics length: {len(cleaned)} characters")
+        
+        return cleaned

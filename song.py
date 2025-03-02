@@ -57,36 +57,71 @@ class Song:
         for key, value in self.audio.items():
             # Mutagen returns lists for tag values
             if len(value) == 1:
-                self.all_metadata[key] = value[0]
+                self.all_metadata[key.lower()] = value[0]
             else:
-                self.all_metadata[key] = value
+                self.all_metadata[key.lower()] = value
             
             # Also add to base_metadata for preserving existing tags
-            self.base_metadata[key] = value
+            self.base_metadata[key.lower()] = value
         
         self.logger.debug(f"Loaded {len(self.all_metadata)} metadata tags")
     
+    def _load_audio(self) -> Optional[FLAC]:
+        """Load the FLAC audio file.
+        
+        Returns:
+            Optional[FLAC]: FLAC object if successful, None otherwise
+        """
+        try:
+            return FLAC(str(self.filepath))
+        except Exception as e:
+            self.logger.error(f"Error loading FLAC file {self.filepath}: {e}")
+            return None
+    
     def save_overwrite(self) -> bool:
-        """Save metadata to the file, clearing all existing metadata.
+        """Save metadata, clearing all existing metadata.
         
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            # Clear all existing tags
-            self.audio.clear()
+            # Make sure file exists
+            if not self.filepath.exists():
+                self.logger.error(f"File not found: {self.filepath}")
+                return False
             
-            # Add new tags
-            for key, value in self.base_metadata.items():
+            # Load the file
+            audio = self._load_audio()
+            if not audio:
+                return False
+            
+            # Clear existing tags
+            audio.clear()
+            
+            # Add all the new tags from all_metadata (not base_metadata)
+            for key, value in self.all_metadata.items():
+                # Skip empty values
+                if value is None or value == "":
+                    continue
+                
+                # Debug log for large values like lyrics
+                if isinstance(value, str) and len(value) > 100:
+                    self.logger.debug(f"Setting large metadata {key} with length {len(value)}")
+                
+                # Convert to uppercase for FLAC tags
+                tag_key = key.upper()
+                
+                # Handle list or single value
                 if isinstance(value, list):
-                    self.audio[key] = value
+                    audio[tag_key] = [str(v) for v in value]
                 else:
-                    self.audio[key] = [str(value)]
+                    audio[tag_key] = str(value)
             
-            # Save file
-            self.audio.save()
+            # Save the file
+            audio.save()
             self.logger.info(f"Saved metadata (overwrite) to {self.filepath}")
             return True
+            
         except Exception as e:
             self.logger.error(f"Error saving metadata to {self.filepath}: {e}")
             return False
@@ -98,17 +133,40 @@ class Song:
             bool: True if successful, False otherwise
         """
         try:
-            # Add or update tags
-            for key, value in self.base_metadata.items():
-                if isinstance(value, list):
-                    self.audio[key] = value
-                else:
-                    self.audio[key] = [str(value)]
+            # Make sure file exists
+            if not self.filepath.exists():
+                self.logger.error(f"File not found: {self.filepath}")
+                return False
             
-            # Save file
-            self.audio.save()
+            # Load the file
+            audio = self._load_audio()
+            if not audio:
+                return False
+            
+            # Add or update tags from all_metadata
+            for key, value in self.all_metadata.items():
+                # Skip empty values
+                if value is None or value == "":
+                    continue
+                
+                # Debug log for large values like lyrics
+                if isinstance(value, str) and len(value) > 100:
+                    self.logger.debug(f"Setting large metadata {key} with length {len(value)}")
+                
+                # Convert to uppercase for FLAC tags
+                tag_key = key.upper()
+                
+                # Handle list or single value
+                if isinstance(value, list):
+                    audio[tag_key] = [str(v) for v in value]
+                else:
+                    audio[tag_key] = str(value)
+            
+            # Save the file
+            audio.save()
             self.logger.info(f"Saved metadata (additive) to {self.filepath}")
             return True
+            
         except Exception as e:
             self.logger.error(f"Error saving metadata to {self.filepath}: {e}")
             return False

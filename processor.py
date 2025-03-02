@@ -62,12 +62,12 @@ class TinfoilProcessor:
         self.cover_art_cog = CoverArtCog(self.logger)
         
         # Initialize individual lyrics cogs
-        self.genius_lyrics_cog = GeniusLyricsCog(Config.GENIUS_API_KEY, self.logger)
+        self.genius_lyrics_cog = GeniusLyricsCog(self.logger)
         self.lrclib_lyrics_cog = LrclibLyricsCog(self.logger)
         self.netease_lyrics_cog = NeteaseLyricsCog(self.logger)
         
         # Initialize combined lyrics cog
-        self.combined_lyrics_cog = CombinedLyricsCog(Config.GENIUS_API_KEY, self.logger)
+        self.combined_lyrics_cog = CombinedLyricsCog(self.logger)
         
         # List of cogs in processing order
         self.cogs: List[BaseCog] = [
@@ -131,6 +131,9 @@ class TinfoilProcessor:
                 self.logger.warning(f"Could not copy {file_path} to {output_path}")
                 return False
             
+            # Propagate metadata (including lyrics) from original song to the copied song
+            new_song.all_metadata = song.all_metadata.copy()
+            
             # Save metadata to new file
             if new_song.save_overwrite():
                 self.logger.info(f"Successfully processed {file_path} to {output_path}")
@@ -142,6 +145,7 @@ class TinfoilProcessor:
         except Exception as e:
             self.logger.error(f"Error processing {file_path}: {e}")
             return False
+
     
     def _generate_output_path(self, song: Song, output_dir: Path) -> Optional[Path]:
         """Generate output path for a processed song.
