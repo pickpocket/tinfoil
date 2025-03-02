@@ -7,6 +7,8 @@ from typing import Optional, Dict, Any, List, Tuple
 import logging
 import json
 import difflib
+import traceback
+import requests
 
 from base_cog import BaseCog
 from song import Song
@@ -73,17 +75,16 @@ class MusicBrainzCog(BaseCog):
             # Get existing metadata for comparison
             existing_metadata = self._extract_existing_metadata(song)
             
-            # Fetch recording metadata
-            recording_data = self.get_recording_metadata(recording_id)
-            if not recording_data:
-                self.logger.warning(f"Could not fetch MusicBrainz metadata for recording {recording_id}")
-                return False
+            # OVERRIDE: Make a direct request to the MusicBrainz API to get release information
+            # This is more reliable than going through the library's get_recording_by_id
+            release_data = self._direct_fetch_release_for_recording(recording_id)
             
-            # Get releases and find best match based on existing metadata
-            releases = recording_data.get('recording', {}).get('release-list', [])
-            if not releases:
+            if not release_data or not release_data.get('releases'):
                 self.logger.warning(f"No releases found for recording {recording_id}")
                 return False
+            
+            releases = release_data.get('releases', [])
+            self.logger.info(f"Found {len(releases)} releases for processing")
             
             # Find best matching release
             best_match = self.find_best_matching_release(releases, existing_metadata)
@@ -101,18 +102,14 @@ class MusicBrainzCog(BaseCog):
             
             # Get release details
             release_id = album_release.get('id')
-            release_data = self.get_release_metadata(release_id)
+            detailed_release = self.get_release_metadata(release_id)
             
-            if not release_data:
-                self.logger.warning(f"Could not fetch detailed release metadata for {release_id}")
-                # We can still proceed with limited metadata
-            
-            # Prepare metadata from recording and release data
+            # Prepare metadata
             metadata = self._prepare_metadata(
-                recording_data.get('recording', {}),
+                release_data,  # Use the recording data from our direct fetch
                 album_release,
                 date_release,
-                release_data
+                detailed_release
             )
             
             # Update song metadata
@@ -123,7 +120,49 @@ class MusicBrainzCog(BaseCog):
             
         except Exception as e:
             self.logger.error(f"Error processing metadata for {song.filepath}: {e}")
+            self.logger.error(traceback.format_exc())
             return False
+    
+    def _direct_fetch_release_for_recording(self, recording_id: str) -> Dict[str, Any]:
+        """Directly fetch release data for a recording using custom request.
+        
+        This is a more reliable way to get release information for a recording.
+        
+        Args:
+            recording_id: MusicBrainz recording ID
+            
+        Returns:
+            Dict[str, Any]: Recording data with releases
+        """
+        
+        # Set up the headers
+        headers = {
+            'User-Agent': f"{Config.MB_APP_NAME}/{Config.MB_VERSION} ( {Config.MB_CONTACT} )"
+        }
+        
+        # Set up the URL with proper includes
+        url = f"https://musicbrainz.org/ws/2/recording/{recording_id}?fmt=json&inc=releases"
+        
+        self.logger.debug(f"Making direct request to MusicBrainz API: {url}")
+        
+        try:
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            data = response.json()
+            self.logger.debug(f"Received direct response with keys: {list(data.keys())}")
+            
+            if 'releases' in data:
+                self.logger.debug(f"Found {len(data['releases'])} releases in response")
+            else:
+                self.logger.debug("No 'releases' key in response")
+            
+            return data
+            
+        except Exception as e:
+            self.logger.error(f"Error in direct fetch: {e}")
+            self.logger.error(traceback.format_exc())
+            return {}
     
     def _extract_existing_metadata(self, song: Song) -> Dict[str, str]:
         """Extract relevant existing metadata from a song.
@@ -305,10 +344,14 @@ class MusicBrainzCog(BaseCog):
         """
         if 'date' in release and release['date']:
             return True
-        if 'release-event-list' in release and release['release-event-list']:
-            for event in release['release-event-list']:
-                if 'date' in event and event['date']:
-                    return True
+        
+        # Check both formats
+        for key in ['release-events', 'release-event-list']:
+            if key in release and release[key]:
+                for event in release[key]:
+                    if 'date' in event and event['date']:
+                        return True
+        
         return False
 
     def extract_year_from_release(self, release: Optional[Dict[str, Any]]) -> str:
@@ -330,16 +373,17 @@ class MusicBrainzCog(BaseCog):
                 return date_str.split('-')[0]
             return date_str
 
-        # Check release events
-        if 'release-event-list' in release:
-            events = release['release-event-list']
-            if events and isinstance(events, list):
-                for event in events:
-                    if 'date' in event and event['date']:
-                        date_str = event['date']
-                        if '-' in date_str:
-                            return date_str.split('-')[0]
-                        return date_str
+        # Check both event list formats
+        for key in ['release-events', 'release-event-list']:
+            if key in release:
+                events = release[key]
+                if events and isinstance(events, list):
+                    for event in events:
+                        if 'date' in event and event['date']:
+                            date_str = event['date']
+                            if '-' in date_str:
+                                return date_str.split('-')[0]
+                            return date_str
 
         return "UnknownYear"
 
@@ -415,11 +459,28 @@ class MusicBrainzCog(BaseCog):
         Returns:
             Optional[int]: Track number if found
         """
-        if 'medium-list' in release:
-            for medium in release['medium-list']:
-                for track in medium.get('track-list', []):
-                    if track.get('recording', {}).get('id') == recording_id:
-                        return int(track.get('position', 0))
+        # Check both formats
+        for media_key, track_key in [('media', 'tracks'), ('medium-list', 'track-list')]:
+            if media_key in release:
+                for medium in release[media_key]:
+                    for track in medium.get(track_key, []):
+                        # Try two ways to match the recording
+                        recording_match = False
+                        
+                        # Direct recording ID match
+                        if track.get('recording', {}).get('id') == recording_id:
+                            recording_match = True
+                        
+                        # Recording ID in 'recording' attribute
+                        if track.get('recording-id') == recording_id:
+                            recording_match = True
+                            
+                        if recording_match:
+                            try:
+                                return int(track.get('position', 0))
+                            except (ValueError, TypeError):
+                                pass
+        
         return None
 
     def get_disc_number(
@@ -436,16 +497,30 @@ class MusicBrainzCog(BaseCog):
         Returns:
             Optional[int]: Disc number if found
         """
-        if 'medium-list' in release:
-            for i, medium in enumerate(release['medium-list'], 1):
-                for track in medium.get('track-list', []):
-                    if track.get('recording', {}).get('id') == recording_id:
-                        return i
+        # Check both formats
+        for media_key, track_key in [('media', 'tracks'), ('medium-list', 'track-list')]:
+            if media_key in release:
+                for i, medium in enumerate(release[media_key], 1):
+                    for track in medium.get(track_key, []):
+                        # Try two ways to match the recording
+                        recording_match = False
+                        
+                        # Direct recording ID match
+                        if track.get('recording', {}).get('id') == recording_id:
+                            recording_match = True
+                        
+                        # Recording ID in 'recording' attribute
+                        if track.get('recording-id') == recording_id:
+                            recording_match = True
+                            
+                        if recording_match:
+                            return i
+        
         return None
     
     def _prepare_metadata(
         self,
-        recording: Dict[str, Any],
+        recording_data: Dict[str, Any],
         album_release: Dict[str, Any],
         date_release: Dict[str, Any],
         detailed_release: Optional[Dict[str, Any]] = None
@@ -453,7 +528,7 @@ class MusicBrainzCog(BaseCog):
         """Prepare metadata from MusicBrainz data.
         
         Args:
-            recording: Recording data
+            recording_data: Recording data
             album_release: Album release data
             date_release: Release data with date information
             detailed_release: Detailed release data (optional)
@@ -463,12 +538,12 @@ class MusicBrainzCog(BaseCog):
         """
         metadata = {}
         
-        # Basic metadata
-        metadata['title'] = recording.get('title', 'Unknown Title')
+        # Basic metadata from recording data
+        metadata['title'] = recording_data.get('title', 'Unknown Title')
         
         # Artist
-        if 'artist-credit' in recording:
-            metadata['artist'] = self.get_english_artist(recording['artist-credit'])
+        if 'artist-credit' in recording_data:
+            metadata['artist'] = self.get_english_artist(recording_data['artist-credit'])
         
         # Album
         metadata['album'] = album_release.get('title', 'Unknown Album')
@@ -484,12 +559,12 @@ class MusicBrainzCog(BaseCog):
             metadata['date'] = self.extract_year_from_release(date_release)
         
         # MusicBrainz IDs
-        metadata['musicbrainz_recordingid'] = recording.get('id', '')
+        metadata['musicbrainz_recordingid'] = recording_data.get('id', '')
         metadata['musicbrainz_albumid'] = album_release.get('id', '')
         
         # Artist IDs
-        if 'artist-credit' in recording:
-            for credit in recording['artist-credit']:
+        if 'artist-credit' in recording_data:
+            for credit in recording_data['artist-credit']:
                 if isinstance(credit, dict) and 'artist' in credit:
                     metadata['musicbrainz_artistid'] = credit['artist'].get('id', '')
                     break
@@ -502,7 +577,7 @@ class MusicBrainzCog(BaseCog):
                     break
         
         # Track and disc numbers
-        rec_id = recording.get('id', '')
+        rec_id = recording_data.get('id', '')
         
         # Try to get from detailed release first
         if detailed_release:
