@@ -20,15 +20,16 @@ Tinfoil is a powerful FLAC audio processing application that automatically ident
 - Python 3.8+
 - AcoustID API key (get one from [acoustid.org](https://acoustid.org/login))
 - Chromaprint (`fpcalc` executable) - required for audio fingerprinting
-- Optional: Genius API key for using Genius lyrics
+- Optional: Genius API key for using Genius lyrics (set via environment variable)
 
 ### Python Dependencies
 
-- `acoustid`: For audio fingerprinting
+- `pyacoustid`: For audio fingerprinting
 - `musicbrainzngs`: For MusicBrainz API access
 - `mutagen`: For audio file metadata handling
 - `requests`: For API requests
 - `pillow`: For image processing
+- `beautifulsoup4`: For HTML parsing (Genius lyrics)
 
 ## Installation
 
@@ -70,7 +71,6 @@ Main Arguments:
   -i, --input INPUT         Input file or directory path
   -o, --output OUTPUT       Output directory
   -k, --api-key API_KEY     AcoustID API key
-  --genius-key GENIUS_KEY   Genius API key
 
 Operation Options:
   --force                   Force update even if metadata exists
