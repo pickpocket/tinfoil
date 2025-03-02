@@ -34,16 +34,41 @@ def setup_logging(verbose: bool = False) -> logging.Logger:
         import musicbrainzngs
         musicbrainzngs.set_rate_limit(False)
     
-    # Configure logging
+    # Configure the file handler
+    file_handler = logging.FileHandler(log_dir / 'tinfoil.log', encoding='utf-8')
+    file_handler.setLevel(log_level)
+    file_handler.setFormatter(logging.Formatter(Config.LOG_FORMAT))
+    
+    # Configure the console handler with error handling for non-Unicode terminals
+    class UnicodeConsoleHandler(logging.StreamHandler):
+        def emit(self, record):
+            try:
+                msg = self.format(record)
+                stream = self.stream
+                stream.write(msg + self.terminator)
+                self.flush()
+            except UnicodeEncodeError:
+                # Fall back to ASCII representation if the console can't handle Unicode
+                fallback_msg = record.getMessage().encode('ascii', 'replace').decode('ascii')
+                formatted = self.format(logging.LogRecord(
+                    record.name, record.levelno, record.pathname, record.lineno,
+                    fallback_msg, record.args, record.exc_info, record.funcName
+                ))
+                stream = self.stream
+                stream.write(formatted + self.terminator)
+                self.flush()
+            except Exception:
+                self.handleError(record)
+    
+    console_handler = UnicodeConsoleHandler()
+    console_handler.setLevel(log_level)
+    console_handler.setFormatter(logging.Formatter(Config.LOG_FORMAT))
+    
+    # Configure the root logger
     logging.basicConfig(
         level=log_level,
         format=Config.LOG_FORMAT,
-        handlers=[
-            # Console handler
-            logging.StreamHandler(),
-            # File handler
-            logging.FileHandler(log_dir / 'tinfoil.log')
-        ]
+        handlers=[console_handler, file_handler]
     )
     
     logger = logging.getLogger('tinfoil')
