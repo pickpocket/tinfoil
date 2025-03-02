@@ -107,12 +107,6 @@ def parse_args() -> argparse.Namespace:
         help="AcoustID API key (default: from environment variable ACOUSTID_API_KEY)"
     )
     
-    parser.add_argument(
-        '--genius-key',
-        default=Config.GENIUS_API_KEY,
-        help="Genius API key (default: from environment variable GENIUS_API_KEY)"
-    )
-    
     # Operation options
     operation_group = parser.add_argument_group('Operation Options')
     operation_group.add_argument(
@@ -252,7 +246,6 @@ def main() -> int:
     try:
         # Update config with command line API keys
         Config.ACOUSTID_API_KEY = args.api_key
-        Config.GENIUS_API_KEY = args.genius_key
         
         # Create processor
         processor = TinfoilProcessor(
