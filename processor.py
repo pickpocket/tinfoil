@@ -18,7 +18,6 @@ from cogs.cover_art_cog import CoverArtCog
 from cogs.genius_lyrics_cog import GeniusLyricsCog
 from cogs.lrclib_lyrics_cog import LrclibLyricsCog
 from cogs.netease_lyrics_cog import NeteaseLyricsCog
-from cogs.combined_lyrics_cog import CombinedLyricsCog
 from cogs.tag_based_match_cog import TagBasedMatchCog
 
 
@@ -30,7 +29,9 @@ class TinfoilProcessor:
         api_key: Optional[str] = None,
         fpcalc_path: Optional[str] = None,
         output_pattern: Optional[str] = None,
-        logger: Optional[logging.Logger] = None
+        logger: Optional[logging.Logger] = None,
+        custom_cogs: Optional[List[BaseCog]] = None,  # New parameter for custom cogs
+        lyrics_source: str = "genius"  # Default lyrics source
     ):
         """Initialize TinfoilProcessor.
         
@@ -39,6 +40,8 @@ class TinfoilProcessor:
             fpcalc_path: Path to fpcalc executable
             output_pattern: Pattern for output filenames
             logger: Logger instance
+            custom_cogs: Custom list of cogs to use instead of the default pipeline
+            lyrics_source: Which lyrics source to use ('genius', 'lrclib', 'netease', or 'none')
         """
         self.logger = logger or logging.getLogger(__name__)
         
@@ -55,28 +58,45 @@ class TinfoilProcessor:
         # Use provided output pattern or get from config
         self.output_pattern = output_pattern or Config.DEFAULT_OUTPUT_PATTERN
         
-        # Initialize cogs
-        self.acoustid_cog = AcoustIDCog(self.api_key, self.fpcalc_path, self.logger)
-        self.tag_based_match_cog = TagBasedMatchCog(self.logger)
-        self.musicbrainz_cog = MusicBrainzCog(self.logger)
-        self.cover_art_cog = CoverArtCog(self.logger)
-        
-        # Initialize individual lyrics cogs
-        self.genius_lyrics_cog = GeniusLyricsCog(self.logger)
-        self.lrclib_lyrics_cog = LrclibLyricsCog(self.logger)
-        self.netease_lyrics_cog = NeteaseLyricsCog(self.logger)
-        
-        # Initialize combined lyrics cog
-        self.combined_lyrics_cog = CombinedLyricsCog(self.logger)
-        
-        # List of cogs in processing order
-        self.cogs: List[BaseCog] = [
-            self.acoustid_cog,
-            self.tag_based_match_cog,  # Try tag-based matching if AcoustID fails
-            self.musicbrainz_cog,
-            self.cover_art_cog,
-            self.combined_lyrics_cog  # Use the combined lyrics cog by default
-        ]
+        # If custom cogs are provided, use them
+        if custom_cogs:
+            self.cogs = custom_cogs
+            self.logger.info(f"Using custom cog pipeline with {len(custom_cogs)} cogs")
+        else:
+            # Initialize standard cogs
+            self.acoustid_cog = AcoustIDCog(self.api_key, self.fpcalc_path, self.logger)
+            self.tag_based_match_cog = TagBasedMatchCog(self.logger)
+            self.musicbrainz_cog = MusicBrainzCog(self.logger)
+            self.cover_art_cog = CoverArtCog(self.logger)
+            
+            # Initialize individual lyrics cogs
+            self.genius_lyrics_cog = GeniusLyricsCog(self.logger)
+            self.lrclib_lyrics_cog = LrclibLyricsCog(self.logger)
+            self.netease_lyrics_cog = NeteaseLyricsCog(self.logger)
+            
+            # List of cogs in processing order (default without lyrics)
+            self.cogs: List[BaseCog] = [
+                self.acoustid_cog,
+                self.tag_based_match_cog,  # Try tag-based matching if AcoustID fails
+                self.musicbrainz_cog,
+                self.cover_art_cog
+            ]
+            
+            # Add the selected lyrics cog
+            if lyrics_source == "genius":
+                self.cogs.append(self.genius_lyrics_cog)
+                self.logger.info("Using Genius for lyrics")
+            elif lyrics_source == "lrclib":
+                self.cogs.append(self.lrclib_lyrics_cog)
+                self.logger.info("Using LRCLIB for lyrics")
+            elif lyrics_source == "netease":
+                self.cogs.append(self.netease_lyrics_cog)
+                self.logger.info("Using NetEase for lyrics")
+            elif lyrics_source == "none":
+                self.logger.info("Lyrics fetching disabled")
+            else:
+                self.logger.warning(f"Unknown lyrics source '{lyrics_source}', defaulting to Genius")
+                self.cogs.append(self.genius_lyrics_cog)
     
     def process_file(self, file_path: Path, output_dir: Path, force_update: bool = False) -> bool:
         """Process a single audio file.

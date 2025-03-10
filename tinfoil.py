@@ -25,6 +25,7 @@ def setup_logging(verbose: bool = False) -> logging.Logger:
     """
     # Create logs directory if it doesn't exist
     log_dir = Config.get_log_dir()
+    log_dir.mkdir(parents=True, exist_ok=True)
     
     # Set up logging level
     log_level = logging.DEBUG if verbose else Config.DEFAULT_LOG_LEVEL
@@ -88,20 +89,20 @@ def parse_args() -> argparse.Namespace:
     )
     
     # Main operation arguments
-    parser.add_argument(
+    input_group = parser.add_argument_group('Input/Output')
+    input_group.add_argument(
         '-i', '--input',
-        required=True,
         help="Input file or directory path"
     )
     
-    parser.add_argument(
+    input_group.add_argument(
         '-o', '--output',
         default=str(Config.get_default_output_dir()),
         help=f"Output directory (default: {Config.get_default_output_dir()})"
     )
     
     # API Keys
-    parser.add_argument(
+    input_group.add_argument(
         '-k', '--api-key',
         default=Config.ACOUSTID_API_KEY,
         help="AcoustID API key (default: from environment variable ACOUSTID_API_KEY)"
@@ -125,9 +126,9 @@ def parse_args() -> argparse.Namespace:
     lyrics_group = parser.add_argument_group('Lyrics Options')
     lyrics_group.add_argument(
         '--lyrics-source',
-        choices=['combined', 'genius', 'lrclib', 'netease', 'none'],
-        default='combined',
-        help="Lyrics source to use (default: combined)"
+        choices=['genius', 'lrclib', 'netease', 'none'],
+        default='genius',
+        help="Lyrics source to use (default: genius)"
     )
     
     # Metadata options
@@ -147,7 +148,7 @@ def parse_args() -> argparse.Namespace:
     )
     
     # Paths
-    parser.add_argument(
+    metadata_group.add_argument(
         '--fpcalc-path',
         default=Config.get_fpcalc_path(),
         help="Path to fpcalc executable (default: auto-detected)"
@@ -167,10 +168,31 @@ def parse_args() -> argparse.Namespace:
         help="Enable detailed MusicBrainz API debugging"
     )
     
-    parser.add_argument(
+    debug_group.add_argument(
         '--validate',
         action='store_true',
         help="Validate setup and exit"
+    )
+    
+    # REST API options
+    api_group = parser.add_argument_group('REST API Options')
+    api_group.add_argument(
+        '--api',
+        action='store_true',
+        help="Start the REST API server"
+    )
+    
+    api_group.add_argument(
+        '--api-host',
+        default='127.0.0.1',
+        help="API server host (default: 127.0.0.1)"
+    )
+    
+    api_group.add_argument(
+        '--api-port',
+        type=int,
+        default=8000,
+        help="API server port (default: 8000)"
     )
     
     parser.add_argument(
@@ -247,28 +269,39 @@ def main() -> int:
         # Update config with command line API keys
         Config.ACOUSTID_API_KEY = args.api_key
         
-        # Create processor
+        # Start API server if requested
+        if args.api:
+            try:
+                import uvicorn
+                from api import app
+                
+                logger.info(f"Starting API server on {args.api_host}:{args.api_port}")
+                uvicorn.run(
+                    "api:app", 
+                    host=args.api_host, 
+                    port=args.api_port, 
+                    log_level="info" if not args.verbose else "debug"
+                )
+                return 0
+            except ImportError:
+                logger.error("Failed to start API server. Make sure FastAPI and Uvicorn are installed:")
+                logger.error("pip install fastapi uvicorn python-multipart")
+                return 1
+        
+        # If not starting API server, input is required
+        if not args.input:
+            logger.error("Input path is required when not in API mode")
+            logger.error("Use -i/--input to specify an input file or directory, or use --api to start the API server")
+            return 1
+        
+        # Create processor with the selected lyrics source
         processor = TinfoilProcessor(
             api_key=args.api_key,
             fpcalc_path=args.fpcalc_path,
             output_pattern=args.pattern,
-            logger=logger
+            logger=logger,
+            lyrics_source=args.lyrics_source
         )
-        
-        # Configure lyrics source
-        if args.lyrics_source != 'combined':
-            # Remove the default combined lyrics cog
-            processor.cogs = [cog for cog in processor.cogs 
-                            if cog.__class__.__name__ != 'CombinedLyricsCog']
-            
-            # Add the selected lyrics cog
-            if args.lyrics_source == 'genius':
-                processor.cogs.append(processor.genius_lyrics_cog)
-            elif args.lyrics_source == 'lrclib':
-                processor.cogs.append(processor.lrclib_lyrics_cog)
-            elif args.lyrics_source == 'netease':
-                processor.cogs.append(processor.netease_lyrics_cog)
-            # 'none' means don't add any lyrics cog
         
         # Configure tag-based fallback
         if not args.tag_fallback:

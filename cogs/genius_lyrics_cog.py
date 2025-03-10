@@ -19,6 +19,10 @@ from config import Config
 class GeniusLyricsCog(BaseCog):
     """Handle fetching lyrics from Genius using their search API and web scraping."""
     
+    # Define input and output tags for automatic dependency resolution
+    input_tags = ['artist', 'title']
+    output_tags = ['lyrics']
+    
     def __init__(self, logger: Optional[logging.Logger] = None):
         """Initialize GeniusLyricsCog.
         
@@ -462,7 +466,7 @@ class GeniusLyricsCog(BaseCog):
                                     self.logger.debug(f"Found lyrics using title-based search, length: {len(cleaned_lyrics)}")
                                     return cleaned_lyrics
             
-            # Print the entire HTML content for debugging
+            # Print the entire HTML structure for debugging
             self.logger.debug("HTML structure summary:")
             for tag in soup.find_all(['div', 'section']):
                 if 'class' in tag.attrs:
