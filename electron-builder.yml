@@ -1,0 +1,52 @@
+appId: "com.tinfoil.app"
+productName: "Tinfoil"
+copyright: "Copyright © 2025"
+
+directories:
+  output: "dist"
+  buildResources: "build"
+
+files:
+  - "build/**/*"
+  - "node_modules/**/*"
+  - "src/**/*"
+  - "public/**/*"
+  - "main.js"
+  - "preload.js"
+  - "package.json"
+
+extraResources:
+  - from: "python"
+    to: "python"
+    filter: ["**/*", "!**/__pycache__", "!**/*.pyc"]
+
+win:
+  target: "nsis"
+  icon: "build/icon.ico"
+
+mac:
+  target: "dmg"
+  icon: "build/icon.icns"
+  category: "public.app-category.music"
+
+linux:
+  target: ["AppImage", "deb"]
+  icon: "build/icon.png"
+  category: "Audio"
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: "link"
+      path: "/Applications"
+
+artifactName: "${productName}-${version}-${os}-${arch}.${ext}"

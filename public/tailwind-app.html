@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tinfoil Audio Manager</title>
+  <!-- Use CDN for Tailwind -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              200: '#bae6fd',
+              300: '#7dd3fc',
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+              800: '#075985',
+              900: '#0c4a6e',
+            },
+          },
+        },
+      },
+    }
+  </script>
+  <style type="text/tailwindcss">
+    /* Custom styles */
+    .log-item {
+      @apply mb-1;
+    }
+    .log-info {
+      @apply text-gray-300;
+    }
+    .log-error {
+      @apply text-red-400;
+    }
+    .log-success {
+      @apply text-green-400;
+    }
+    .file-item {
+      @apply border-b border-gray-200 py-2 px-3 hover:bg-gray-50 cursor-pointer transition-colors;
+    }
+    .file-item.selected {
+      @apply bg-blue-50;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-100">
+  <div class="container mx-auto p-4 max-w-full">
+    <!-- Header -->
+    <header class="bg-white shadow-md rounded-lg p-4 mb-6">
+      <h1 class="text-2xl font-bold text-gray-800">Tinfoil Audio Manager</h1>
+      <p class="text-gray-600">FLAC Audio Fingerprinting and Metadata Management</p>
+      
+      <div class="mt-2">
+        <span id="apiStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+          API Status: Unknown
+        </span>
+        <button 
+          id="checkApi"
+          class="ml-2 text-xs text-blue-600 hover:text-blue-800"
+        >
+          Check
+        </button>
+      </div>
+    </header>
+    
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- File List (Left Panel) -->
+      <div class="lg:col-span-3">
+        <div class="bg-white shadow-md rounded-lg overflow-hidden h-full">
+          <div class="p-4 border-b border-gray-200 bg-gray-50">
+            <h2 class="text-lg font-semibold">Music Files</h2>
+            <p id="fileCount" class="text-sm text-gray-500">No files selected</p>
+          </div>
+          
+          <div id="fileListContainer" class="overflow-y-auto" style="max-height: 500px;">
+            <div id="fileList" class="divide-y divide-gray-200">
+              <!-- File list will be populated here -->
+              <div class="p-4 text-gray-500 text-center">
+                Select an input directory to see files
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Processing Panel (Middle) -->
+      <div class="lg:col-span-6">
+        <div class="bg-white shadow-md rounded-lg p-4">
+          <h2 class="text-xl font-semibold mb-4">Process Files</h2>
+          
+          <div class="space-y-4">
+            <!-- Input Directory -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Input Directory</label>
+              <div class="flex">
+                <input
+                  id="inputPath"
+                  type="text"
+                  value=""
+                  readonly
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-l-md bg-gray-50"
+                  placeholder="Select input directory"
+                />
+                <button
+                  id="selectInput"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Browse
+                </button>
+              </div>
+            </div>
+            
+            <!-- Output Directory -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Output Directory</label>
+              <div class="flex">
+                <input
+                  id="outputPath"
+                  type="text"
+                  value=""
+                  readonly
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-l-md bg-gray-50"
+                  placeholder="Select output directory"
+                />
+                <button
+                  id="selectOutput"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Browse
+                </button>
+              </div>
+            </div>
+            
+            <!-- Process Options -->
+            <div class="pt-2">
+              <div class="flex items-start">
+                <div class="flex items-center h-5">
+                  <input
+                    id="forceUpdate"
+                    type="checkbox"
+                    class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                  />
+                </div>
+                <div class="ml-3 text-sm">
+                  <label for="forceUpdate" class="font-medium text-gray-700">Force Update</label>
+                  <p class="text-gray-500">Process files even if metadata already exists</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Process Button -->
+            <div class="pt-4">
+              <button
+                id="processButton"
+                class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 opacity-50 cursor-not-allowed"
+                disabled
+              >
+                Process Files
+              </button>
+            </div>
+          </div>
+          
+          <!-- File Details Section (for selected file) -->
+          <div id="fileDetails" class="mt-6 pt-6 border-t border-gray-200 hidden">
+            <h3 class="text-lg font-semibold mb-2">File Details</h3>
+            <div id="fileDetailsContent" class="bg-gray-50 p-4 rounded">
+              <!-- File details will be shown here -->
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Logs Panel (Right) -->
+      <div class="lg:col-span-3">
+        <div class="bg-white shadow-md rounded-lg p-4 h-full">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">Logs</h2>
+            <button 
+              id="clearLogs"
+              class="text-xs text-gray-600 hover:text-gray-800"
+            >
+              Clear
+            </button>
+          </div>
+          
+          <div id="logContainer" class="bg-gray-900 rounded-md h-64 overflow-y-auto p-2 text-sm font-mono">
+            <p class="text-gray-500 text-xs">Application initialized. Waiting for Python API...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // DOM elements
+    const apiStatus = document.getElementById('apiStatus');
+    const checkApiButton = document.getElementById('checkApi');
+    const inputPathField = document.getElementById('inputPath');
+    const outputPathField = document.getElementById('outputPath');
+    const selectInputButton = document.getElementById('selectInput');
+    const selectOutputButton = document.getElementById('selectOutput');
+    const processButton = document.getElementById('processButton');
+    const logContainer = document.getElementById('logContainer');
+    const clearLogsButton = document.getElementById('clearLogs');
+    const fileList = document.getElementById('fileList');
+    const fileCount = document.getElementById('fileCount');
+    const fileDetails = document.getElementById('fileDetails');
+    const fileDetailsContent = document.getElementById('fileDetailsContent');
+    const forceUpdateCheckbox = document.getElementById('forceUpdate');
+    
+    // Application state
+    let isProcessing = false;
+    let apiConnected = false;
+    let currentFiles = [];
+    let selectedFile = null;
+    
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      // Setup Python log listeners
+      if (window.api) {
+        window.api.onPythonLog((data) => {
+          addLog(`Python: ${data}`, 'info');
+        });
+        
+        window.api.onPythonError((data) => {
+          addLog(`Python: ${data}`, 'error');
+        });
+      }
+      
+      // Check API connection on start
+      setTimeout(checkApiConnection, 1000);
+    });
+    
+    // Log function
+    function addLog(message, type = 'info') {
+      const logItem = document.createElement('div');
+      logItem.className = `log-item ${type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-info'}`;
+      
+      const timestamp = document.createElement('span');
+      timestamp.className = 'text-gray-500 text-xs select-none';
+      timestamp.textContent = `[${new Date().toLocaleTimeString()}] `;
+      
+      logItem.appendChild(timestamp);
+      logItem.appendChild(document.createTextNode(message));
+      
+      logContainer.appendChild(logItem);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+    
+    // Load files from directory
+    async function loadFilesFromDirectory(directory) {
+      try {
+        addLog(`Loading files from: ${directory}`, 'info');
+        
+        const response = await fetch(`http://localhost:8000/list_files?directory=${encodeURIComponent(directory)}`);
+        const data = await response.json();
+        
+        if (data.files && Array.isArray(data.files)) {
+          currentFiles = data.files;
+          renderFileList();
+          addLog(`Found ${data.files.length} FLAC files`, 'info');
+        } else {
+          addLog('No files found or invalid response', 'error');
+        }
+      } catch (error) {
+        addLog(`Error loading files: ${error.message}`, 'error');
+      }
+    }
+    
+    // Render file list
+    function renderFileList() {
+  // Clear file list
+  fileList.innerHTML = '';
+  
+  // Update file count
+  fileCount.textContent = `${currentFiles.length} FLAC files`;
+  
+  if (currentFiles.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'p-4 text-gray-500 text-center';
+    emptyMessage.textContent = 'No FLAC files found in this directory';
+    fileList.appendChild(emptyMessage);
+    return;
+  }
+  
+  // Add files to list
+  currentFiles.forEach((file, index) => {
+    const fileItem = document.createElement('div');
+    fileItem.className = 'file-item';
+    fileItem.dataset.index = index;
+    fileItem.id = `file-${file.path.replace(/[^a-zA-Z0-9]/g, '-')}`; // Generate a unique ID based on path
+    
+    // Build file info display
+    const fileName = document.createElement('div');
+    fileName.className = 'font-medium text-gray-900 truncate';
+    fileName.textContent = file.name;
+    
+    const filePath = document.createElement('div');
+    filePath.className = 'text-xs text-gray-500 truncate';
+    filePath.textContent = file.relative_path;
+    
+    const fileSize = document.createElement('div');
+    fileSize.className = 'text-xs text-gray-400';
+    fileSize.textContent = file.size_human;
+    
+    fileItem.appendChild(fileName);
+    fileItem.appendChild(filePath);
+    fileItem.appendChild(fileSize);
+    
+    // Add click handler to select file
+    fileItem.addEventListener('click', () => {
+      selectFile(index);
+    });
+    
+    fileList.appendChild(fileItem);
+  });
+}
+    
+    // Select a file from the list
+    async function selectFile(index) {
+      // Remove selected class from all items
+      document.querySelectorAll('.file-item').forEach(item => {
+        item.classList.remove('selected');
+      });
+      
+      // Get file item
+      const fileItem = document.querySelector(`.file-item[data-index="${index}"]`);
+      if (fileItem) {
+        fileItem.classList.add('selected');
+      }
+      
+      // Store selected file
+      selectedFile = currentFiles[index];
+      
+      // Show file details
+      showFileDetails(selectedFile);
+      
+      // Try to analyze the file to get metadata
+      await analyzeFile(selectedFile.path);
+    }
+    
+    // Show file details
+    function showFileDetails(file) {
+      // Display the details section
+      fileDetails.classList.remove('hidden');
+      
+      // Clear previous content
+      fileDetailsContent.innerHTML = '';
+      
+      // Basic file info
+      const details = document.createElement('div');
+      details.innerHTML = `
+        <div class="mb-2">
+          <span class="text-sm font-medium text-gray-500">Filename:</span>
+          <span class="ml-2 text-sm text-gray-900">${file.name}</span>
+        </div>
+        <div class="mb-2">
+          <span class="text-sm font-medium text-gray-500">Path:</span>
+          <span class="ml-2 text-sm text-gray-900">${file.relative_path}</span>
+        </div>
+        <div>
+          <span class="text-sm font-medium text-gray-500">Size:</span>
+          <span class="ml-2 text-sm text-gray-900">${file.size_human}</span>
+        </div>
+        <div class="mt-4" id="metadataSection">
+          <div class="text-center py-2 text-sm text-gray-500">
+            <svg class="animate-spin h-5 w-5 mx-auto text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p>Analyzing file metadata...</p>
+          </div>
+        </div>
+      `;
+      
+      fileDetailsContent.appendChild(details);
+    }
+    
+    // Analyze file to get metadata
+    async function analyzeFile(filePath) {
+      try {
+        // Make API call to get metadata
+        const response = await fetch(`http://localhost:8000/analyze_file?file_path=${encodeURIComponent(filePath)}`);
+        
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // Update UI with metadata
+        updateMetadataDisplay(data);
+      } catch (error) {
+        addLog(`Error analyzing file: ${error.message}`, 'error');
+        
+        // Show error in metadata section
+        const metadataSection = document.getElementById('metadataSection');
+        if (metadataSection) {
+          metadataSection.innerHTML = `
+            <div class="text-center py-2 text-sm text-red-500">
+              <p>Error analyzing file: ${error.message}</p>
+            </div>
+          `;
+        }
+      }
+    }
+    
+    // Update metadata display
+    function updateMetadataDisplay(metadata) {
+      const metadataSection = document.getElementById('metadataSection');
+      if (!metadataSection) return;
+      
+      // Check if we have actual metadata
+      if (!metadata || Object.keys(metadata).length === 0) {
+        metadataSection.innerHTML = `
+          <div class="text-center py-2 text-sm text-gray-500">
+            <p>No metadata available</p>
+          </div>
+        `;
+        return;
+      }
+      
+      // Create metadata table
+      let html = `
+        <h4 class="font-medium text-gray-700 mb-2">File Metadata</h4>
+        <div class="bg-white border border-gray-200 rounded overflow-hidden">
+      `;
+      
+      // Extract key metadata
+      const title = metadata.title || 'Unknown Title';
+      const artist = metadata.artist || 'Unknown Artist';
+      const album = metadata.album || '';
+      const hasCoverArt = metadata.has_cover_art || false;
+      
+      // Show main metadata
+      html += `
+        <div class="p-3 border-b border-gray-200">
+          <div class="text-lg font-medium text-gray-900">${title}</div>
+          <div class="text-md text-gray-700">${artist}</div>
+          ${album ? `<div class="text-sm text-gray-500">${album}</div>` : ''}
+        </div>
+      `;
+      
+      // Show other metadata
+      html += `<div class="p-3 text-sm grid grid-cols-2 gap-2">`;
+      
+      // Show key-value pairs for other metadata
+      const excludeKeys = ['title', 'artist', 'album', 'has_cover_art'];
+      Object.entries(metadata)
+        .filter(([key]) => !excludeKeys.includes(key))
+        .forEach(([key, value]) => {
+          html += `
+            <div class="text-gray-500">${key}:</div>
+            <div class="text-gray-900 truncate">${value}</div>
+          `;
+        });
+      
+      html += `</div>`;
+      
+      // Add cover art info
+      html += `
+        <div class="p-3 border-t border-gray-200 flex items-center ${hasCoverArt ? 'text-green-600' : 'text-gray-500'}">
+          <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${hasCoverArt ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12'}"></path>
+          </svg>
+          <span>${hasCoverArt ? 'Has cover art' : 'No cover art'}</span>
+        </div>
+      `;
+      
+      html += `</div>`;
+      
+      metadataSection.innerHTML = html;
+    }
+    
+    // Button handlers
+    selectInputButton.addEventListener('click', async () => {
+      try {
+        const paths = await window.api.selectDirectory();
+        if (paths && paths.length > 0) {
+          inputPathField.value = paths[0];
+          addLog(`Selected input directory: ${paths[0]}`, 'info');
+          updateProcessButton();
+          
+          // Load files from this directory
+          await loadFilesFromDirectory(paths[0]);
+        }
+      } catch (error) {
+        addLog(`Error selecting input directory: ${error.message}`, 'error');
+      }
+    });
+    
+    selectOutputButton.addEventListener('click', async () => {
+      try {
+        const paths = await window.api.selectOutputDirectory();
+        if (paths && paths.length > 0) {
+          outputPathField.value = paths[0];
+          addLog(`Selected output directory: ${paths[0]}`, 'info');
+          updateProcessButton();
+        }
+      } catch (error) {
+        addLog(`Error selecting output directory: ${error.message}`, 'error');
+      }
+    });
+    
+    processButton.addEventListener('click', async () => {
+      if (!inputPathField.value || !outputPathField.value || !apiConnected || isProcessing) {
+        return;
+      }
+      
+      try {
+        setProcessing(true);
+        addLog('Starting processing...', 'info');
+        
+        const response = await fetch('http://localhost:8000/process_directory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            input_path: inputPathField.value,
+            output_path: outputPathField.value,
+            force_update: forceUpdateCheckbox.checked,
+            lyrics_source: 'genius'
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.job_id) {
+          addLog(`Processing job started: ${data.job_id}`, 'success');
+          // Poll for job status
+          pollJobStatus(data.job_id);
+        } else {
+          addLog('Failed to start processing job', 'error');
+          setProcessing(false);
+        }
+      } catch (error) {
+        addLog(`Error processing files: ${error.message}`, 'error');
+        setProcessing(false);
+      }
+    });
+    
+    checkApiButton.addEventListener('click', checkApiConnection);
+    
+    clearLogsButton.addEventListener('click', () => {
+      logContainer.innerHTML = '';
+      addLog('Logs cleared', 'info');
+    });
+    
+    // Helper functions
+    async function checkApiConnection() {
+      try {
+        addLog('Checking Python API connection...', 'info');
+        updateApiStatus('checking');
+        
+        const response = await fetch('http://localhost:8000/config');
+        const data = await response.json();
+        
+        addLog(`API connection successful! Tinfoil version: ${data.version}`, 'success');
+        updateApiStatus('connected');
+        apiConnected = true;
+        updateProcessButton();
+      } catch (error) {
+        addLog(`API connection failed: ${error.message}`, 'error');
+        updateApiStatus('error');
+        apiConnected = false;
+        updateProcessButton();
+      }
+    }
+    
+    function updateApiStatus(status) {
+      if (status === 'connected') {
+        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+        apiStatus.textContent = 'API Status: Connected';
+      } else if (status === 'error') {
+        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+        apiStatus.textContent = 'API Status: Error';
+      } else {
+        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
+        apiStatus.textContent = 'API Status: Checking...';
+      }
+    }
+    
+    function setProcessing(processing) {
+      isProcessing = processing;
+      
+      if (processing) {
+        processButton.innerHTML = `
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Processing...
+        `;
+      } else {
+        processButton.textContent = 'Process Files';
+      }
+      
+      updateProcessButton();
+    }
+    
+    function updateProcessButton() {
+      const canProcess = inputPathField.value && outputPathField.value && apiConnected && !isProcessing;
+      
+      if (canProcess) {
+        processButton.disabled = false;
+        processButton.classList.remove('opacity-50', 'cursor-not-allowed');
+      } else {
+        processButton.disabled = true;
+        processButton.classList.add('opacity-50', 'cursor-not-allowed');
+      }
+    }
+    
+    async function pollJobStatus(jobId) {
+      const interval = setInterval(async () => {
+        try {
+          const response = await fetch(`http://localhost:8000/status/${jobId}`);
+          const data = await response.json();
+          
+          // Update progress info
+          const progress = Math.round(data.progress * 100);
+          addLog(`Job ${jobId}: ${data.status} (${progress}%)`, 'info');
+          
+          if (data.status === 'completed' || data.status === 'failed') {
+            clearInterval(interval);
+            
+            if (data.status === 'completed') {
+              addLog(`Job ${jobId} completed successfully!`, 'success');
+              if (data.result && data.result.output_dir) {
+                addLog(`Output directory: ${data.result.output_dir}`, 'success');
+              }
+            } else {
+              addLog(`Job ${jobId} failed: ${data.error || 'Unknown error'}`, 'error');
+            }
+            
+            setProcessing(false);
+          }
+        } catch (error) {
+          addLog(`Error checking job status: ${error.message}`, 'error');
+          clearInterval(interval);
+          setProcessing(false);
+        }
+      }, 1000);
+    }
+  </script>
+</body>
+</html>

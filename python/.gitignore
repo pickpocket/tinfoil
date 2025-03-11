@@ -1,0 +1,10 @@
+# Python cache files
+__pycache__/
+cogs/__pycache__
+utils/__pycache__
+*.py[cod]
+*$py.class
+
+input/
+output/
+tech_spec.md

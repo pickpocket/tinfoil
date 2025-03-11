@@ -2,6 +2,10 @@
 @file api.py
 @brief REST API for the Tinfoil application.
 """
+from cors_middleware import configure_cors
+import os
+from pathlib import Path
+import json
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,14 +45,7 @@ app = FastAPI(
 )
 
 # Add custom CORS middleware
-app.add_middleware(
-    CORSMiddlewareWithDebug,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allow all HTTP methods
-    allow_headers=["*"],  # Allow all headers
-    expose_headers=["*"]  # Expose all headers
-)
+app = configure_cors(app)
 
 # Setup logging
 logger = logging.getLogger("tinfoil-api")
@@ -107,6 +104,37 @@ def create_cors_response(content, status_code=200, headers=None):
         all_headers.update(headers)
     return JSONResponse(content=content, status_code=status_code, headers=all_headers)
 
+@app.get("/analyze_file")
+async def analyze_file(file_path: str):
+    """Analyze a FLAC file and return its metadata."""
+    try:
+        from mutagen.flac import FLAC
+        
+        logger.info(f"Analyzing file: {file_path}")
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+        # Load the FLAC file
+        audio = FLAC(file_path)
+        
+        # Extract metadata
+        metadata = {}
+        for key, value in audio.items():
+            # Mutagen returns lists for tag values
+            metadata[key.lower()] = value[0] if len(value) == 1 else value
+        
+        # Check for cover art
+        metadata['has_cover_art'] = len(audio.pictures) > 0
+        
+        # Return the metadata
+        return metadata
+    
+    except Exception as e:
+        logger.exception(f"Error analyzing file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # API endpoints
 @app.options("/{rest_of_path:path}")
 async def options_route(rest_of_path: str):
@@ -164,6 +192,155 @@ async def process_file(
         logger.exception(f"Error in process_file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/process_directory")
+async def process_directory(
+    background_tasks: BackgroundTasks,
+    input_path: str = Form(...),
+    output_path: str = Form(...),
+    force_update: bool = Form(False),
+    output_pattern: Optional[str] = Form(None),
+    lyrics_source: str = Form("genius"),
+    tag_fallback: bool = Form(True),
+    api_key: Optional[str] = Form(None)
+):
+    """Process a directory of audio files."""
+    try:
+        job_id = str(uuid.uuid4())
+        
+        # Initialize job status
+        job_store[job_id] = {
+            "status": "pending",
+            "progress": 0.0,
+            "result": None,
+            "error": None
+        }
+        
+        # Process directory in background
+        background_tasks.add_task(
+            process_directory_task, 
+            job_id, 
+            input_path, 
+            output_path,
+            force_update,
+            output_pattern,
+            lyrics_source,
+            tag_fallback,
+            api_key
+        )
+        
+        return JobStatus(job_id=job_id, status="pending")
+    
+    except Exception as e:
+        logger.exception(f"Error in process_directory: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+async def process_directory_task(
+    job_id: str,
+    input_path: str,
+    output_path: str,
+    force_update: bool,
+    output_pattern: Optional[str],
+    lyrics_source: str,
+    tag_fallback: bool,
+    api_key: Optional[str]
+):
+    """Background task to process a directory."""
+    try:
+        # Update job status
+        job_store[job_id]["status"] = "processing"
+        job_store[job_id]["progress"] = 0.1  # Show some initial progress
+        
+        logger.info(f"Processing directory: {input_path}")
+        
+        # Build processor with options
+        processor = TinfoilProcessor(
+            api_key=api_key or Config.ACOUSTID_API_KEY,
+            fpcalc_path=Config.get_fpcalc_path(),
+            output_pattern=output_pattern or Config.DEFAULT_OUTPUT_PATTERN,
+            logger=logger,
+            lyrics_source=lyrics_source
+        )
+        
+        # Configure tag-based fallback
+        if not tag_fallback:
+            processor.cogs = [cog for cog in processor.cogs 
+                             if cog.__class__.__name__ != 'TagBasedMatchCog']
+        
+        job_store[job_id]["progress"] = 0.2  # Processor created
+        
+        # Process the directory
+        input_dir = Path(input_path)
+        output_dir = Path(output_path)
+        
+        # Get all compatible audio files
+        audio_files = processor._get_audio_files(input_dir)
+        total_files = len(audio_files)
+        processed_files = []
+        
+        logger.info(f"Found {total_files} compatible audio files in {input_dir}")
+        
+        # Process each file with progress updates
+        for i, file_path in enumerate(audio_files):
+            try:
+                success = processor.process_file(file_path, output_dir, force_update)
+                if success:
+                    processed_files.append(str(file_path))
+                
+                # Update progress based on files processed
+                progress = 0.2 + (0.8 * (i + 1) / total_files)
+                job_store[job_id]["progress"] = progress
+                
+            except Exception as e:
+                logger.error(f"Error processing file {file_path}: {e}")
+        
+        # Update job status
+        job_store[job_id].update({
+            "status": "completed",
+            "progress": 1.0,
+            "result": {
+                "success": True,
+                "processed_files": len(processed_files),
+                "total_files": total_files,
+                "output_dir": str(output_dir)
+            }
+        })
+        
+        logger.info(f"Successfully processed {len(processed_files)} of {total_files} files")
+    
+    except Exception as e:
+        logger.exception(f"Error processing directory: {e}")
+        job_store[job_id].update({
+            "status": "failed",
+            "progress": 1.0,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+@app.get("/validate_setup")
+async def validate_setup(api_key: Optional[str] = None):
+    """Validate the setup of the application."""
+    try:
+        # Create processor with the provided API key
+        processor = TinfoilProcessor(
+            api_key=api_key or Config.ACOUSTID_API_KEY,
+            fpcalc_path=Config.get_fpcalc_path(),
+            logger=logger
+        )
+        
+        # Validate setup
+        validations = processor.validate_setup()
+        
+        return {
+            "valid": all(validations.values()),
+            "validations": validations,
+            "fpcalc_path": Config.get_fpcalc_path(),
+            "api_key": "valid" if validations.get('api_key', False) else "invalid"
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error validating setup: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 async def process_file_task(
     job_id: str,
     file_path: Path,
@@ -248,6 +425,124 @@ async def process_file_task(
             "traceback": traceback.format_exc()
         })
 
+@app.get("/system_info")
+async def get_system_info():
+    """Get system information for the Electron app."""
+    try:
+        # Check for required dependencies
+        fpcalc_path = Config.get_fpcalc_path()
+        acoustid_key = Config.ACOUSTID_API_KEY
+        
+        # Check system paths
+        app_dir = str(Config.get_app_dir())
+        log_dir = str(Config.get_log_dir())
+        output_dir = str(Config.get_default_output_dir())
+        
+        return {
+            "fpcalc_installed": fpcalc_path is not None,
+            "fpcalc_path": fpcalc_path or "Not found",
+            "acoustid_key_configured": acoustid_key is not None and len(acoustid_key) > 0,
+            "app_dir": app_dir,
+            "log_dir": log_dir,
+            "default_output_dir": output_dir,
+            "system": os.name,
+            "version": Config.VERSION,
+        }
+    except Exception as e:
+        logger.exception(f"Error getting system info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.get("/get_config")
+async def get_config():
+    """Get application configuration."""
+    try:
+        # Filter out sensitive information
+        config_data = {
+            "app_name": Config.APP_NAME,
+            "version": Config.VERSION,
+            "description": Config.DESCRIPTION,
+            "default_output_pattern": Config.DEFAULT_OUTPUT_PATTERN,
+            "supported_audio_formats": Config.SUPPORTED_AUDIO_FORMATS,
+            "max_filename_length": Config.MAX_FILENAME_LENGTH,
+        }
+        
+        # Include API key information if it exists (masked)
+        if Config.ACOUSTID_API_KEY:
+            masked_key = Config.ACOUSTID_API_KEY[:4] + "*" * (len(Config.ACOUSTID_API_KEY) - 8) + Config.ACOUSTID_API_KEY[-4:]
+            config_data["acoustid_api_key_masked"] = masked_key
+            config_data["has_api_key"] = True
+        else:
+            config_data["has_api_key"] = False
+        
+        return config_data
+        
+    except Exception as e:
+        logger.exception(f"Error getting config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+        
+
+@app.post("/save_config")
+async def save_config(config_data: dict):
+    """Save user configuration to a file."""
+    try:
+        # Get the config file path
+        config_file = Config.get_app_dir() / "user_config.json"
+        
+        # Save the config
+        with open(config_file, "w") as f:
+            json.dump(config_data, f, indent=2)
+        
+        return {"success": True, "message": "Configuration saved successfully"}
+    except Exception as e:
+        logger.exception(f"Error saving config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/list_files")
+async def list_files(directory: str):
+    """List FLAC files in a directory."""
+    try:
+        dir_path = Path(directory)
+        if not dir_path.exists() or not dir_path.is_dir():
+            raise HTTPException(status_code=400, detail=f"Directory not found: {directory}")
+        
+        # Find all compatible audio files
+        audio_files = []
+        for file_path in dir_path.rglob('*'):
+            if file_path.is_file() and file_path.suffix.lower() in Config.SUPPORTED_AUDIO_FORMATS:
+                # Get relative path
+                rel_path = file_path.relative_to(dir_path)
+                
+                # Get file info
+                size = file_path.stat().st_size
+                # Format size
+                size_str = ""
+                if size < 1024:
+                    size_str = f"{size} B"
+                elif size < 1024 * 1024:
+                    size_str = f"{size / 1024:.1f} KB"
+                else:
+                    size_str = f"{size / (1024 * 1024):.1f} MB"
+                
+                audio_files.append({
+                    "name": file_path.name,
+                    "path": str(file_path),
+                    "relative_path": str(rel_path),
+                    "size": size,
+                    "size_human": size_str
+                })
+        
+        return {
+            "directory": directory,
+            "file_count": len(audio_files),
+            "files": audio_files
+        }
+        
+    except Exception as e:
+        if not isinstance(e, HTTPException):
+            logger.exception(f"Error listing files: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+        raise
+    
 @app.get("/status/{job_id}", response_model=JobStatus)
 async def get_job_status(job_id: str):
     """Get the status of a job."""
