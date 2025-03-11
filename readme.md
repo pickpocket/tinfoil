@@ -190,3 +190,4 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - MusicBrainz for metadata
 - Cover Art Archive for album artwork
 - Electron and Tailwind CSS for the interface
+- CTAG07[https://github.com/CTAG07] cog system
