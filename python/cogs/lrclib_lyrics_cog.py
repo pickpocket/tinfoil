@@ -15,7 +15,7 @@ class LrclibLyricsCog(BaseCog):
     """Handle lyrics operations using the LRCLIB API."""
     
     # Define what tags this cog needs as input
-    input_tags = ['artist', 'title', 'album', 'length']
+    input_tags = ['artist', 'title', 'album']
     
     # Define what tags this cog provides as output
     output_tags = ['lyrics', 'syncedlyrics']

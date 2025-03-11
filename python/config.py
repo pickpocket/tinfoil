@@ -16,7 +16,7 @@ class Config:
     DESCRIPTION = "FLAC Audio Fingerprinting and Metadata Management"
    
     # API Keys and Authentication
-    ACOUSTID_API_KEY = os.getenv('ACOUSTID_API_KEY')
+    ACOUSTID_API_KEY = ''
    
     # Header configuration
     USER_AGENT = "tinfoil/1.0"

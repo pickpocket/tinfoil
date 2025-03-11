@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import json
 from fastapi import FastAPI, UploadFile, File, Form, Depends, HTTPException, BackgroundTasks, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -65,6 +65,12 @@ class CogInfo(BaseModel):
     output_tags: List[str]
     description: Optional[str] = None
 
+class FileProgress(BaseModel):
+    """Progress information for a specific file"""
+    progress: float = 0.0
+    status: str = "pending"  # "pending", "processing", "completed", "failed"
+    error: Optional[str] = None
+
 class JobStatus(BaseModel):
     """Status of a processing job"""
     job_id: str
@@ -72,6 +78,7 @@ class JobStatus(BaseModel):
     progress: float = 0.0
     result: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
+    file_progress: Optional[Dict[str, FileProgress]] = None
 
 class PipelineRequest(BaseModel):
     """Request model for building a pipeline"""
@@ -135,6 +142,43 @@ async def analyze_file(file_path: str):
         logger.exception(f"Error analyzing file: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/get_cover_art")
+async def get_cover_art(file_path: str):
+    """Extract and return cover art from a FLAC file."""
+    try:
+        from mutagen.flac import FLAC
+        
+        logger.info(f"Extracting cover art from: {file_path}")
+        
+        # Check if file exists
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+        # Load the FLAC file
+        audio = FLAC(file_path)
+        
+        # Check if cover art exists
+        if not audio.pictures:
+            raise HTTPException(status_code=404, detail="No cover art found")
+        
+        # Get the first picture (usually the cover art)
+        picture = audio.pictures[0]
+        
+        # Return the picture data with appropriate content type
+        return Response(
+            content=picture.data,
+            media_type=picture.mime,
+            headers={
+                "Content-Disposition": f"inline; filename=cover.{picture.mime.split('/')[-1]}",
+                "Cache-Control": "max-age=3600",
+                "Access-Control-Allow-Origin": "*"
+            }
+        )
+    
+    except Exception as e:
+        logger.exception(f"Error extracting cover art: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # API endpoints
 @app.options("/{rest_of_path:path}")
 async def options_route(rest_of_path: str):
@@ -167,12 +211,19 @@ async def process_file(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
-        # Initialize job status
+        # Initialize job status with file progress
         job_store[job_id] = {
             "status": "pending",
             "progress": 0.0,
             "result": None,
-            "error": None
+            "error": None,
+            "file_progress": {
+                str(file_path): {
+                    "progress": 0.0,
+                    "status": "pending",
+                    "error": None
+                }
+            }
         }
         
         # Process file in background
@@ -186,7 +237,11 @@ async def process_file(
             lyrics_source
         )
         
-        return JobStatus(job_id=job_id, status="pending")
+        return JobStatus(
+            job_id=job_id, 
+            status="pending",
+            file_progress=job_store[job_id]["file_progress"]
+        )
     
     except Exception as e:
         logger.exception(f"Error in process_file: {e}")
@@ -195,24 +250,45 @@ async def process_file(
 @app.post("/process_directory")
 async def process_directory(
     background_tasks: BackgroundTasks,
-    input_path: str = Form(...),
-    output_path: str = Form(...),
-    force_update: bool = Form(False),
-    output_pattern: Optional[str] = Form(None),
-    lyrics_source: str = Form("genius"),
-    tag_fallback: bool = Form(True),
-    api_key: Optional[str] = Form(None)
+    request: Request
 ):
-    """Process a directory of audio files."""
+    """Process a directory of audio files with selected cogs."""
     try:
         job_id = str(uuid.uuid4())
+        
+        # Parse request body
+        body = await request.json()
+        input_path = body.get('input_path')
+        output_path = body.get('output_path')
+        force_update = body.get('force_update', False)
+        output_pattern = body.get('output_pattern')
+        lyrics_source = body.get('lyrics_source', 'genius')
+        tag_fallback = body.get('tag_fallback', True)
+        api_key = body.get('api_key')
+        selected_cogs = body.get('selected_cogs')
+        
+        # Parse selected cogs
+        cog_list = None
+        if selected_cogs:
+            if isinstance(selected_cogs, str):
+                cog_list = [cog.strip() for cog in selected_cogs.split(",")]
+            elif isinstance(selected_cogs, list):
+                cog_list = selected_cogs
+        
+        # Validate required parameters
+        if not input_path or not output_path:
+            raise HTTPException(
+                status_code=400,
+                detail="input_path and output_path are required"
+            )
         
         # Initialize job status
         job_store[job_id] = {
             "status": "pending",
             "progress": 0.0,
             "result": None,
-            "error": None
+            "error": None,
+            "file_progress": {}  # Will be populated with files from the directory
         }
         
         # Process directory in background
@@ -225,7 +301,8 @@ async def process_directory(
             output_pattern,
             lyrics_source,
             tag_fallback,
-            api_key
+            api_key,
+            cog_list
         )
         
         return JobStatus(job_id=job_id, status="pending")
@@ -242,9 +319,10 @@ async def process_directory_task(
     output_pattern: Optional[str],
     lyrics_source: str,
     tag_fallback: bool,
-    api_key: Optional[str]
+    api_key: Optional[str],
+    selected_cogs: Optional[List[str]] = None
 ):
-    """Background task to process a directory."""
+    """Background task to process a directory with custom cog selection and file progress tracking."""
     try:
         # Update job status
         job_store[job_id]["status"] = "processing"
@@ -266,6 +344,18 @@ async def process_directory_task(
             processor.cogs = [cog for cog in processor.cogs 
                              if cog.__class__.__name__ != 'TagBasedMatchCog']
         
+        # If selected cogs are provided, build custom pipeline
+        if selected_cogs and len(selected_cogs) > 0:
+            logger.info(f"Building custom pipeline with selected cogs: {selected_cogs}")
+            cog_registry = CogRegistry(logger=logger)
+            custom_cogs = build_pipeline(cog_registry, selected_cogs)
+            
+            if custom_cogs:
+                processor.cogs = custom_cogs
+                logger.info(f"Custom pipeline built with {len(custom_cogs)} cogs")
+            else:
+                logger.warning(f"Failed to build pipeline with selected cogs, using default")
+        
         job_store[job_id]["progress"] = 0.2  # Processor created
         
         # Process the directory
@@ -279,19 +369,45 @@ async def process_directory_task(
         
         logger.info(f"Found {total_files} compatible audio files in {input_dir}")
         
+        # Initialize file progress tracking
+        for file_path in audio_files:
+            str_path = str(file_path)
+            job_store[job_id]["file_progress"][str_path] = {
+                "progress": 0.0,
+                "status": "pending",
+                "error": None
+            }
+        
         # Process each file with progress updates
         for i, file_path in enumerate(audio_files):
+            str_path = str(file_path)
             try:
-                success = processor.process_file(file_path, output_dir, force_update)
-                if success:
-                    processed_files.append(str(file_path))
+                # Update file status to processing
+                job_store[job_id]["file_progress"][str_path]["status"] = "processing"
+                job_store[job_id]["file_progress"][str_path]["progress"] = 0.1
                 
-                # Update progress based on files processed
+                # Process the file
+                success = processor.process_file(file_path, output_dir, force_update)
+                
+                if success:
+                    processed_files.append(str_path)
+                    job_store[job_id]["file_progress"][str_path]["status"] = "completed"
+                    job_store[job_id]["file_progress"][str_path]["progress"] = 1.0
+                else:
+                    job_store[job_id]["file_progress"][str_path]["status"] = "failed"
+                    job_store[job_id]["file_progress"][str_path]["error"] = "Processing failed"
+                    job_store[job_id]["file_progress"][str_path]["progress"] = 1.0
+                
+                # Update overall progress based on files processed
                 progress = 0.2 + (0.8 * (i + 1) / total_files)
                 job_store[job_id]["progress"] = progress
                 
             except Exception as e:
-                logger.error(f"Error processing file {file_path}: {e}")
+                error_msg = str(e)
+                logger.error(f"Error processing file {file_path}: {error_msg}")
+                job_store[job_id]["file_progress"][str_path]["status"] = "failed"
+                job_store[job_id]["file_progress"][str_path]["error"] = error_msg
+                job_store[job_id]["file_progress"][str_path]["progress"] = 1.0
         
         # Update job status
         job_store[job_id].update({
@@ -301,7 +417,8 @@ async def process_directory_task(
                 "success": True,
                 "processed_files": len(processed_files),
                 "total_files": total_files,
-                "output_dir": str(output_dir)
+                "output_dir": str(output_dir),
+                "cogs_used": [cog.__class__.__name__ for cog in processor.cogs]
             }
         })
         
@@ -349,11 +466,14 @@ async def process_file_task(
     selected_cogs: Optional[List[str]],
     lyrics_source: str
 ):
-    """Background task to process a file."""
+    """Background task to process a file with progress tracking."""
+    str_path = str(file_path)
     try:
-        # Update job status
+        # Update job and file status
         job_store[job_id]["status"] = "processing"
-        job_store[job_id]["progress"] = 0.1  # Show some initial progress
+        job_store[job_id]["progress"] = 0.1
+        job_store[job_id]["file_progress"][str_path]["status"] = "processing"
+        job_store[job_id]["file_progress"][str_path]["progress"] = 0.1
         
         logger.info(f"Processing file: {file_path}")
         
@@ -366,7 +486,9 @@ async def process_file_task(
             lyrics_source=lyrics_source
         )
         
-        job_store[job_id]["progress"] = 0.2  # Processor created
+        # Update progress
+        job_store[job_id]["progress"] = 0.2
+        job_store[job_id]["file_progress"][str_path]["progress"] = 0.2
         
         if selected_cogs:
             # Build custom pipeline
@@ -379,15 +501,23 @@ async def process_file_task(
             
             logger.info(f"Custom pipeline built with {len(processor.cogs)} cogs")
         
-        job_store[job_id]["progress"] = 0.3  # Pipeline built
+        # Update progress
+        job_store[job_id]["progress"] = 0.3
+        job_store[job_id]["file_progress"][str_path]["progress"] = 0.3
         
         # Process the file
         output_dir = Config.get_default_output_dir() / job_id
         logger.info(f"Processing file to output directory: {output_dir}")
         
+        # Update progress before main processing
+        job_store[job_id]["progress"] = 0.5
+        job_store[job_id]["file_progress"][str_path]["progress"] = 0.5
+        
         success = processor.process_file(file_path, output_dir, force_update)
         
-        job_store[job_id]["progress"] = 0.9  # Processing complete
+        # Update progress after processing
+        job_store[job_id]["progress"] = 0.9
+        job_store[job_id]["file_progress"][str_path]["progress"] = 0.9
         
         if success:
             # Get the output file path
@@ -396,34 +526,46 @@ async def process_file_task(
             
             logger.info(f"Processing succeeded, output file: {output_file}")
             
-            # Update job status
+            # Update job and file status
             job_store[job_id].update({
                 "status": "completed",
                 "progress": 1.0,
                 "result": {
                     "success": True,
                     "output_path": output_file,
-                    "output_dir": str(output_dir)
+                    "output_dir": str(output_dir),
+                    "cogs_used": [cog.__class__.__name__ for cog in processor.cogs]
                 }
             })
+            job_store[job_id]["file_progress"][str_path]["status"] = "completed"
+            job_store[job_id]["file_progress"][str_path]["progress"] = 1.0
         else:
             logger.error(f"Processing failed for file: {file_path}")
             
-            # Update job status
+            # Update job and file status
             job_store[job_id].update({
                 "status": "failed",
                 "progress": 1.0,
                 "error": "Processing failed"
             })
+            job_store[job_id]["file_progress"][str_path]["status"] = "failed"
+            job_store[job_id]["file_progress"][str_path]["progress"] = 1.0
+            job_store[job_id]["file_progress"][str_path]["error"] = "Processing failed"
         
     except Exception as e:
-        logger.exception(f"Error processing file: {e}")
+        error_msg = str(e)
+        logger.exception(f"Error processing file: {error_msg}")
+        
+        # Update job and file status
         job_store[job_id].update({
             "status": "failed",
             "progress": 1.0,
-            "error": str(e),
+            "error": error_msg,
             "traceback": traceback.format_exc()
         })
+        job_store[job_id]["file_progress"][str_path]["status"] = "failed"
+        job_store[job_id]["file_progress"][str_path]["progress"] = 1.0
+        job_store[job_id]["file_progress"][str_path]["error"] = error_msg
 
 @app.get("/system_info")
 async def get_system_info():
@@ -479,7 +621,6 @@ async def get_config():
     except Exception as e:
         logger.exception(f"Error getting config: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-        
 
 @app.post("/save_config")
 async def save_config(config_data: dict):
@@ -545,12 +686,22 @@ async def list_files(directory: str):
     
 @app.get("/status/{job_id}", response_model=JobStatus)
 async def get_job_status(job_id: str):
-    """Get the status of a job."""
+    """Get the status of a job, including individual file progress."""
     try:
         if job_id not in job_store:
             raise HTTPException(status_code=404, detail="Job not found")
         
         job = job_store[job_id]
+        
+        # Convert file progress to proper model instances
+        file_progress = {}
+        if "file_progress" in job:
+            for file_path, progress_data in job["file_progress"].items():
+                file_progress[file_path] = FileProgress(
+                    progress=progress_data.get("progress", 0.0),
+                    status=progress_data.get("status", "pending"),
+                    error=progress_data.get("error")
+                )
         
         # Create JobStatus model to validate and return
         status = JobStatus(
@@ -558,7 +709,8 @@ async def get_job_status(job_id: str):
             status=job["status"],
             progress=job["progress"],
             result=job["result"],
-            error=job.get("error")
+            error=job.get("error"),
+            file_progress=file_progress
         )
         
         # Return with CORS headers
@@ -641,6 +793,61 @@ async def get_config():
         
     except Exception as e:
         logger.exception(f"Error in get_config: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/update_metadata")
+async def update_metadata(request: Request):
+    """Update metadata for a FLAC file."""
+    try:
+        from mutagen.flac import FLAC
+        
+        # Parse request body
+        body = await request.json()
+        file_path = body.get('file_path')
+        metadata = body.get('metadata', {})
+        
+        # Validate request
+        if not file_path:
+            raise HTTPException(status_code=400, detail="file_path is required")
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+        logger.info(f"Updating metadata for file: {file_path}")
+        
+        # Load the FLAC file
+        audio = FLAC(file_path)
+        
+        # Store if file had cover art
+        had_cover_art = len(audio.pictures) > 0
+        
+        # Clear existing metadata (except cover art)
+        audio.clear()
+        
+        # Add new metadata
+        for key, value in metadata.items():
+            # Skip cover_art flag
+            if key == 'has_cover_art':
+                continue
+                
+            # Add tag if value is not empty
+            if value is not None and value != "":
+                audio[key] = str(value)
+        
+        # Save changes
+        audio.save()
+        
+        logger.info(f"Metadata updated successfully for: {file_path}")
+        
+        return {
+            "success": True,
+            "message": "Metadata updated successfully",
+            "file_path": file_path,
+            "has_cover_art": had_cover_art
+        }
+        
+    except Exception as e:
+        logger.exception(f"Error updating metadata: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # Handle 404 errors

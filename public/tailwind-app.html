@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
@@ -29,7 +30,40 @@
     }
   </script>
   <style type="text/tailwindcss">
-    /* Custom styles */
+    /* Apply padding to all textboxes */
+    input[type="text"],
+    input[type="password"],
+    input[type="search"],
+    textarea {
+      @apply p-2;
+    }
+
+    /* Animate button clicks (scale down slightly on click) */
+    button {
+      @apply transition transform duration-200;
+    }
+    button:active {
+      @apply scale-95;
+    }
+
+    /* Nicer scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px; /* Adjust as desired */
+      height: 8px; /* For horizontal scrollbars if any */
+    }
+    ::-webkit-scrollbar-track {
+      @apply bg-gray-100 dark:bg-gray-700;
+    }
+    ::-webkit-scrollbar-thumb {
+      @apply bg-gray-400 dark:bg-gray-600 rounded;
+      border: 2px solid transparent; /* Space around thumb */
+      background-clip: content-box;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      @apply bg-gray-500 dark:bg-gray-500;
+    }
+
+    /* Custom styles for .log-item, .file-item, etc. */
     .log-item {
       @apply mb-1;
     }
@@ -43,27 +77,105 @@
       @apply text-green-400;
     }
     .file-item {
-      @apply border-b border-gray-200 py-2 px-3 hover:bg-gray-50 cursor-pointer transition-colors;
+      @apply border-b border-gray-200 dark:border-gray-700 py-2 px-3 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors;
     }
     .file-item.selected {
-      @apply bg-blue-50;
+      @apply bg-blue-50 dark:bg-blue-900;
+    }
+
+    /* Style for cover art container */
+    .cover-art-container {
+      width: 40px;
+      height: 40px;
+      @apply mr-3 rounded overflow-hidden bg-gray-100 dark:bg-gray-700;
+    }
+
+    /* Style for cover art images */
+    .cover-art-container img {
+      width: 100%;
+      height: 100%;
+      @apply object-cover;
+    }
+
+    /* Style for file info container */
+    .file-info {
+      @apply flex-grow min-w-0;
+    }
+
+    /* Make sure truncation works properly */
+    .file-info .truncate {
+      @apply overflow-hidden text-ellipsis whitespace-nowrap;
+    }
+    
+    /* Progress bar styles */
+    .progress-container {
+      @apply h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden;
+    }
+    .progress-bar {
+      @apply h-full bg-blue-500 transition-all duration-300 ease-in-out;
+    }
+
+    /* Context menu styles */
+    .context-menu {
+      @apply absolute z-50 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 dark:divide-gray-700 focus:outline-none;
+    }
+    .context-menu-item {
+      @apply block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white cursor-pointer;
+    }
+
+    /* Metadata editor modal */
+    .modal {
+      @apply fixed inset-0 z-50 overflow-y-auto;
+    }
+    .modal-overlay {
+      @apply fixed inset-0 bg-black bg-opacity-50 transition-opacity;
+    }
+    .modal-container {
+      @apply bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-xl transform transition-all sm:max-w-lg sm:w-full mx-auto mt-10;
+    }
+    .modal-header {
+      @apply px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700;
+    }
+    .modal-body {
+      @apply px-4 py-5;
+    }
+    .modal-footer {
+      @apply px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex justify-end;
     }
   </style>
 </head>
-<body class="min-h-screen bg-gray-100">
+<body class="min-h-screen bg-gray-100 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
   <div class="container mx-auto p-4 max-w-full">
     <!-- Header -->
-    <header class="bg-white shadow-md rounded-lg p-4 mb-6">
-      <h1 class="text-2xl font-bold text-gray-800">Tinfoil Audio Manager</h1>
-      <p class="text-gray-600">FLAC Audio Fingerprinting and Metadata Management</p>
+    <header class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 mb-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Tinfoil Audio Manager</h1>
+          <p class="text-gray-600 dark:text-gray-300">FLAC Audio Fingerprinting and Metadata Management</p>
+        </div>
+        <div class="flex items-center">
+          <span class="mr-2 text-sm dark:text-gray-300">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline dark:hidden" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707a1 1 0 011.414 0zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd" />
+            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:inline" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+            </svg>
+          </span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="darkModeToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
       
       <div class="mt-2">
-        <span id="apiStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+        <span id="apiStatus" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">
           API Status: Unknown
         </span>
         <button 
           id="checkApi"
-          class="ml-2 text-xs text-blue-600 hover:text-blue-800"
+          class="ml-2 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
         >
           Check
         </button>
@@ -74,16 +186,16 @@
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
       <!-- File List (Left Panel) -->
       <div class="lg:col-span-3">
-        <div class="bg-white shadow-md rounded-lg overflow-hidden h-full">
-          <div class="p-4 border-b border-gray-200 bg-gray-50">
-            <h2 class="text-lg font-semibold">Music Files</h2>
-            <p id="fileCount" class="text-sm text-gray-500">No files selected</p>
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg overflow-hidden h-full">
+          <div class="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+            <h2 class="text-lg font-semibold dark:text-gray-100">Music Files</h2>
+            <p id="fileCount" class="text-sm text-gray-500 dark:text-gray-400">No files selected</p>
           </div>
           
           <div id="fileListContainer" class="overflow-y-auto" style="max-height: 500px;">
-            <div id="fileList" class="divide-y divide-gray-200">
+            <div id="fileList" class="divide-y divide-gray-200 dark:divide-gray-700">
               <!-- File list will be populated here -->
-              <div class="p-4 text-gray-500 text-center">
+              <div class="p-4 text-gray-500 dark:text-gray-400 text-center">
                 Select an input directory to see files
               </div>
             </div>
@@ -93,25 +205,24 @@
       
       <!-- Processing Panel (Middle) -->
       <div class="lg:col-span-6">
-        <div class="bg-white shadow-md rounded-lg p-4">
-          <h2 class="text-xl font-semibold mb-4">Process Files</h2>
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4">
+          <h2 class="text-xl font-semibold mb-4 dark:text-gray-100">Process Files</h2>
           
           <div class="space-y-4">
             <!-- Input Directory -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Input Directory</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Input Directory</label>
               <div class="flex">
                 <input
                   id="inputPath"
                   type="text"
-                  value=""
                   readonly
-                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-l-md bg-gray-50"
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-l-md bg-gray-50 dark:bg-gray-700 dark:text-gray-100"
                   placeholder="Select input directory"
                 />
                 <button
                   id="selectInput"
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
                 >
                   Browse
                 </button>
@@ -120,19 +231,18 @@
             
             <!-- Output Directory -->
             <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Output Directory</label>
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Output Directory</label>
               <div class="flex">
                 <input
                   id="outputPath"
                   type="text"
-                  value=""
                   readonly
-                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-l-md bg-gray-50"
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-l-md bg-gray-50 dark:bg-gray-700 dark:text-gray-100"
                   placeholder="Select output directory"
                 />
                 <button
                   id="selectOutput"
-                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-r-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
                 >
                   Browse
                 </button>
@@ -146,12 +256,12 @@
                   <input
                     id="forceUpdate"
                     type="checkbox"
-                    class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 rounded"
+                    class="focus:ring-blue-500 h-4 w-4 text-blue-600 border-gray-300 dark:border-gray-600 rounded"
                   />
                 </div>
                 <div class="ml-3 text-sm">
-                  <label for="forceUpdate" class="font-medium text-gray-700">Force Update</label>
-                  <p class="text-gray-500">Process files even if metadata already exists</p>
+                  <label for="forceUpdate" class="font-medium text-gray-700 dark:text-gray-300">Force Update</label>
+                  <p class="text-gray-500 dark:text-gray-400">Process files even if metadata already exists</p>
                 </div>
               </div>
             </div>
@@ -160,19 +270,96 @@
             <div class="pt-4">
               <button
                 id="processButton"
-                class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 opacity-50 cursor-not-allowed"
+                class="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 opacity-50 cursor-not-allowed"
                 disabled
               >
                 Process Files
               </button>
             </div>
+            
+            <!-- Overall Progress Bar -->
+            <div id="overallProgressContainer" class="pt-4 hidden">
+              <div class="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
+                <span>Overall Progress</span>
+                <span id="overallProgressText">0%</span>
+              </div>
+              <div class="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                <div id="overallProgressBar" class="h-full bg-blue-500 transition-all duration-300 ease-in-out" style="width: 0%"></div>
+              </div>
+            </div>
           </div>
           
-          <!-- File Details Section (for selected file) -->
-          <div id="fileDetails" class="mt-6 pt-6 border-t border-gray-200 hidden">
-            <h3 class="text-lg font-semibold mb-2">File Details</h3>
-            <div id="fileDetailsContent" class="bg-gray-50 p-4 rounded">
-              <!-- File details will be shown here -->
+          <!-- Cog Selection Panel -->
+          <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 mt-6">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold dark:text-gray-100">Processing Pipeline</h2>
+              <div>
+                <button 
+                  id="refreshCogs"
+                  class="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  Refresh
+                </button>
+                <button 
+                  id="resetCogs"
+                  class="ml-2 text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                >
+                  Reset Selection
+                </button>
+              </div>
+            </div>
+            
+            <!-- Cog filter/search -->
+            <div class="mb-4">
+              <div class="flex space-x-2">
+                <input 
+                  id="cogSearch" 
+                  type="text" 
+                  placeholder="Search cogs..." 
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100"
+                />
+                <select 
+                  id="cogFilter" 
+                  class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100"
+                >
+                  <option value="all">All Cogs</option>
+                  <option value="selected">Selected</option>
+                  <option value="available">Available</option>
+                  <option value="unavailable">Unavailable</option>
+                </select>
+              </div>
+            </div>
+            
+            <!-- Selected cogs summary -->
+            <div class="mb-4 p-3 bg-blue-50 dark:bg-blue-900 rounded-md border border-blue-100 dark:border-blue-800">
+              <h3 class="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Selected Cogs</h3>
+              <div id="selectedCogsSummary" class="text-sm text-blue-700 dark:text-blue-300">
+                <p>No cogs selected. Select processing components below.</p>
+              </div>
+            </div>
+            
+            <!-- Available tags display -->
+            <div class="mb-4">
+              <div class="flex flex-wrap gap-1">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mr-1">Available Inputs:</div>
+                <div id="availableInputTags" class="flex flex-wrap gap-1"></div>
+              </div>
+              <div class="flex flex-wrap gap-1 mt-2">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mr-1">Available Outputs:</div>
+                <div id="availableOutputTags" class="flex flex-wrap gap-1"></div>
+              </div>
+            </div>
+            
+            <!-- Cogs list -->
+            <div id="cogsList" class="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden divide-y divide-gray-200 dark:divide-gray-700">
+              <!-- Cogs will be loaded here -->
+              <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+                <svg class="animate-spin h-5 w-5 mx-auto text-blue-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading available processing components...
+              </div>
             </div>
           </div>
         </div>
@@ -180,20 +367,128 @@
       
       <!-- Logs Panel (Right) -->
       <div class="lg:col-span-3">
-        <div class="bg-white shadow-md rounded-lg p-4 h-full">
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-4 h-full">
           <div class="flex justify-between items-center mb-4">
-            <h2 class="text-xl font-semibold">Logs</h2>
+            <h2 class="text-xl font-semibold dark:text-gray-100">Logs</h2>
             <button 
               id="clearLogs"
-              class="text-xs text-gray-600 hover:text-gray-800"
+              class="text-xs text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300"
             >
               Clear
             </button>
           </div>
           
-          <div id="logContainer" class="bg-gray-900 rounded-md h-64 overflow-y-auto p-2 text-sm font-mono">
+          <div id="logContainer" class="bg-gray-900 dark:bg-black rounded-md h-64 overflow-y-auto p-2 text-sm font-mono">
             <p class="text-gray-500 text-xs">Application initialized. Waiting for Python API...</p>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Context menu for file actions -->
+  <div id="fileContextMenu" class="context-menu hidden">
+    <div class="py-1">
+      <div class="context-menu-item view-edit-metadata">
+        <div class="flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+          </svg>
+          View/Edit Metadata
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Metadata Editor Modal -->
+  <div id="metadataModal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-container">
+      <div class="modal-header">
+        <div class="flex justify-between items-center">
+          <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Edit Metadata</h3>
+          <button id="closeMetadataModal" class="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <form id="metadataForm" class="space-y-4">
+          <div class="grid grid-cols-1 gap-4">
+            <div class="flex">
+              <!-- Cover art preview -->
+              <div class="w-32 h-32 bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden mr-4 flex-shrink-0">
+                <img id="metadataCoverArt" class="w-full h-full object-cover" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23cccccc'%3E%3Cpath d='M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z'%3E%3C/path%3E%3C/svg%3E">
+              </div>
+              
+              <!-- Main metadata fields -->
+              <div class="flex-grow">
+                <div class="mb-3">
+                  <label for="metadataTitle" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                  <input id="metadataTitle" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                
+                <div class="mb-3">
+                  <label for="metadataArtist" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Artist</label>
+                  <input id="metadataArtist" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                
+                <div>
+                  <label for="metadataAlbum" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Album</label>
+                  <input id="metadataAlbum" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+              </div>
+            </div>
+            
+            <!-- Additional metadata fields -->
+            <div>
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional Metadata</h4>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="metadataGenre" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Genre</label>
+                  <input id="metadataGenre" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                
+                <div>
+                  <label for="metadataYear" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Year</label>
+                  <input id="metadataYear" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                
+                <div>
+                  <label for="metadataTrack" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Track Number</label>
+                  <input id="metadataTrack" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                
+                <div>
+                  <label for="metadataDisc" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Disc Number</label>
+                  <input id="metadataDisc" type="text" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100">
+                </div>
+              </div>
+            </div>
+            
+            <!-- Custom metadata -->
+            <div id="customMetadataContainer">
+              <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Metadata</h4>
+              <div id="customMetadataFields" class="space-y-2">
+                <!-- Custom fields will be added here -->
+              </div>
+              <button type="button" id="addCustomField" class="mt-2 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                + Add Custom Field
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <div class="flex space-x-3">
+          <button id="cancelMetadataEdit" class="inline-flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 shadow-sm text-sm font-medium rounded-md text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+            Cancel
+          </button>
+          <button id="saveMetadataEdit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+            Save Changes
+          </button>
         </div>
       </div>
     </div>
@@ -212,47 +507,264 @@
     const clearLogsButton = document.getElementById('clearLogs');
     const fileList = document.getElementById('fileList');
     const fileCount = document.getElementById('fileCount');
-    const fileDetails = document.getElementById('fileDetails');
-    const fileDetailsContent = document.getElementById('fileDetailsContent');
     const forceUpdateCheckbox = document.getElementById('forceUpdate');
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    const overallProgressContainer = document.getElementById('overallProgressContainer');
+    const overallProgressBar = document.getElementById('overallProgressBar');
+    const overallProgressText = document.getElementById('overallProgressText');
+    
+    // Context menu and metadata editor elements
+    const fileContextMenu = document.getElementById('fileContextMenu');
+    const metadataModal = document.getElementById('metadataModal');
+    const closeMetadataModal = document.getElementById('closeMetadataModal');
+    const cancelMetadataEdit = document.getElementById('cancelMetadataEdit');
+    const saveMetadataEdit = document.getElementById('saveMetadataEdit');
+    const metadataForm = document.getElementById('metadataForm');
+    const metadataCoverArt = document.getElementById('metadataCoverArt');
+    const metadataTitle = document.getElementById('metadataTitle');
+    const metadataArtist = document.getElementById('metadataArtist');
+    const metadataAlbum = document.getElementById('metadataAlbum');
+    const metadataGenre = document.getElementById('metadataGenre');
+    const metadataYear = document.getElementById('metadataYear');
+    const metadataTrack = document.getElementById('metadataTrack');
+    const metadataDisc = document.getElementById('metadataDisc');
+    const customMetadataFields = document.getElementById('customMetadataFields');
+    const addCustomField = document.getElementById('addCustomField');
+    
+    // Cog-related elements
+    const cogsList = document.getElementById('cogsList');
+    const cogSearch = document.getElementById('cogSearch');
+    const cogFilter = document.getElementById('cogFilter');
+    const refreshCogsButton = document.getElementById('refreshCogs');
+    const resetCogsButton = document.getElementById('resetCogs');
+    const selectedCogsSummary = document.getElementById('selectedCogsSummary');
+    const availableInputTags = document.getElementById('availableInputTags');
+    const availableOutputTags = document.getElementById('availableOutputTags');
     
     // Application state
     let isProcessing = false;
     let apiConnected = false;
     let currentFiles = [];
-    let selectedFile = null;
+    let fileProgressMap = {};
+    let activeContextMenuFileIndex = null;
+    let metadataEditTarget = null;
+    let editedMetadata = {};
+    
+    // Cog selection state
+    let allCogs = [];
+    let selectedCogs = [];
+    let availableInputTagsSet = new Set();
+    let availableOutputTagsSet = new Set();
     
     // Initialize
     document.addEventListener('DOMContentLoaded', () => {
-      // Setup Python log listeners
+      initDarkMode();
+      
       if (window.api) {
         window.api.onPythonLog((data) => {
           addLog(`Python: ${data}`, 'info');
         });
-        
         window.api.onPythonError((data) => {
           addLog(`Python: ${data}`, 'error');
         });
       }
       
-      // Check API connection on start
+      setupContextMenuListeners();
+      setupMetadataEditorListeners();
+      
+      // Check API connection on startup
       setTimeout(checkApiConnection, 1000);
+      setTimeout(() => {
+        if (apiConnected) {
+          loadCogs();
+        }
+      }, 1500);
     });
     
-    // Log function
-    function addLog(message, type = 'info') {
-      const logItem = document.createElement('div');
-      logItem.className = `log-item ${type === 'error' ? 'log-error' : type === 'success' ? 'log-success' : 'log-info'}`;
+    // Dark mode handling
+    function initDarkMode() {
+      const savedTheme = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       
-      const timestamp = document.createElement('span');
-      timestamp.className = 'text-gray-500 text-xs select-none';
-      timestamp.textContent = `[${new Date().toLocaleTimeString()}] `;
+      if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+        document.documentElement.classList.add('dark');
+        darkModeToggle.checked = true;
+      } else {
+        document.documentElement.classList.remove('dark');
+        darkModeToggle.checked = false;
+      }
       
-      logItem.appendChild(timestamp);
-      logItem.appendChild(document.createTextNode(message));
+      darkModeToggle.addEventListener('change', () => {
+        if (darkModeToggle.checked) {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('theme', 'dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('theme', 'light');
+        }
+      });
+    }
+    
+    // Context menu for each file
+    function setupContextMenuListeners() {
+      document.addEventListener('click', (e) => {
+        if (!fileContextMenu.contains(e.target) && 
+            !e.target.classList.contains('file-menu-trigger')) {
+          fileContextMenu.classList.add('hidden');
+        }
+      });
       
-      logContainer.appendChild(logItem);
-      logContainer.scrollTop = logContainer.scrollHeight;
+      // "View/Edit Metadata" from context menu
+      document.querySelector('.view-edit-metadata').addEventListener('click', () => {
+        if (activeContextMenuFileIndex !== null) {
+          const file = currentFiles[activeContextMenuFileIndex];
+          openMetadataEditor(file);
+          fileContextMenu.classList.add('hidden');
+        }
+      });
+    }
+    
+    // Metadata editor
+    function setupMetadataEditorListeners() {
+      closeMetadataModal.addEventListener('click', closeMetadataEditorModal);
+      cancelMetadataEdit.addEventListener('click', closeMetadataEditorModal);
+      saveMetadataEdit.addEventListener('click', saveMetadataChanges);
+      
+      addCustomField.addEventListener('click', () => {
+        appendCustomField('', '');
+      });
+    }
+    
+    /**
+     * Appends a new custom metadata field
+     */
+    function appendCustomField(key, value) {
+      const fieldContainer = document.createElement('div');
+      fieldContainer.className = 'flex items-center space-x-2';
+      
+      const keyInput = document.createElement('input');
+      keyInput.type = 'text';
+      keyInput.className = 'shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100';
+      keyInput.placeholder = 'Field Name';
+      keyInput.value = key;
+      
+      const valueInput = document.createElement('input');
+      valueInput.type = 'text';
+      valueInput.className = 'shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 dark:text-gray-100';
+      valueInput.placeholder = 'Value';
+      valueInput.value = value;
+      
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300';
+      removeButton.innerHTML = '<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>';
+      removeButton.addEventListener('click', () => fieldContainer.remove());
+      
+      fieldContainer.appendChild(keyInput);
+      fieldContainer.appendChild(valueInput);
+      fieldContainer.appendChild(removeButton);
+      
+      customMetadataFields.appendChild(fieldContainer);
+    }
+    
+    // Open the metadata editor for a file
+    async function openMetadataEditor(file) {
+      metadataEditTarget = file;
+      metadataForm.reset();
+      customMetadataFields.innerHTML = '';
+      
+      try {
+        const response = await fetch(`http://localhost:8000/analyze_file?file_path=${encodeURIComponent(file.path)}`);
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}`);
+        }
+        
+        const metadata = await response.json();
+        editedMetadata = { ...metadata };
+        
+        metadataTitle.value = metadata.title || '';
+        metadataArtist.value = metadata.artist || '';
+        metadataAlbum.value = metadata.album || '';
+        metadataGenre.value = metadata.genre || '';
+        metadataYear.value = metadata.date || '';
+        metadataTrack.value = metadata.tracknumber || '';
+        metadataDisc.value = metadata.discnumber || '';
+        
+        // Load cover art if present
+        if (metadata.has_cover_art) {
+          metadataCoverArt.src = `http://localhost:8000/get_cover_art?file_path=${encodeURIComponent(file.path)}`;
+        } else {
+          metadataCoverArt.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cccccc"%3E%3Cpath d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"%3E%3C/path%3E%3C/svg%3E';
+        }
+        
+        const standardFields = ['title','artist','album','genre','date','tracknumber','discnumber','has_cover_art'];
+        for (const [k, v] of Object.entries(metadata)) {
+          if (!standardFields.includes(k)) {
+            appendCustomField(k, v);
+          }
+        }
+        
+        metadataModal.classList.remove('hidden');
+      } catch (error) {
+        addLog(`Error loading metadata: ${error.message}`, 'error');
+      }
+    }
+    
+    // Close metadata editor
+    function closeMetadataEditorModal() {
+      metadataModal.classList.add('hidden');
+      metadataEditTarget = null;
+      editedMetadata = {};
+    }
+    
+    // Save metadata changes
+    async function saveMetadataChanges() {
+      if (!metadataEditTarget) return;
+      
+      try {
+        const updatedMetadata = {
+          title: metadataTitle.value,
+          artist: metadataArtist.value,
+          album: metadataAlbum.value,
+          genre: metadataGenre.value,
+          date: metadataYear.value,
+          tracknumber: metadataTrack.value,
+          discnumber: metadataDisc.value
+        };
+        
+        const customFields = customMetadataFields.querySelectorAll('div');
+        customFields.forEach(field => {
+          const inputs = field.querySelectorAll('input');
+          if (inputs[0].value.trim()) {
+            updatedMetadata[inputs[0].value.trim()] = inputs[1].value;
+          }
+        });
+        
+        const response = await fetch('http://localhost:8000/update_metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_path: metadataEditTarget.path,
+            metadata: updatedMetadata
+          })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          addLog(`Metadata updated successfully for ${metadataEditTarget.name}`, 'success');
+        } else {
+          throw new Error(result.message || 'Unknown error');
+        }
+        
+        closeMetadataEditorModal();
+      } catch (error) {
+        addLog(`Error saving metadata: ${error.message}`, 'error');
+      }
     }
     
     // Load files from directory
@@ -265,6 +777,13 @@
         
         if (data.files && Array.isArray(data.files)) {
           currentFiles = data.files;
+          fileProgressMap = {};
+          currentFiles.forEach(file => {
+            fileProgressMap[file.path] = {
+              progress: 0,
+              status: 'pending'
+            };
+          });
           renderFileList();
           addLog(`Found ${data.files.length} FLAC files`, 'info');
         } else {
@@ -275,212 +794,449 @@
       }
     }
     
-    // Render file list
+    // Render file list with cover art thumbnails and a context menu
     function renderFileList() {
-  // Clear file list
-  fileList.innerHTML = '';
-  
-  // Update file count
-  fileCount.textContent = `${currentFiles.length} FLAC files`;
-  
-  if (currentFiles.length === 0) {
-    const emptyMessage = document.createElement('div');
-    emptyMessage.className = 'p-4 text-gray-500 text-center';
-    emptyMessage.textContent = 'No FLAC files found in this directory';
-    fileList.appendChild(emptyMessage);
-    return;
-  }
-  
-  // Add files to list
-  currentFiles.forEach((file, index) => {
-    const fileItem = document.createElement('div');
-    fileItem.className = 'file-item';
-    fileItem.dataset.index = index;
-    fileItem.id = `file-${file.path.replace(/[^a-zA-Z0-9]/g, '-')}`; // Generate a unique ID based on path
-    
-    // Build file info display
-    const fileName = document.createElement('div');
-    fileName.className = 'font-medium text-gray-900 truncate';
-    fileName.textContent = file.name;
-    
-    const filePath = document.createElement('div');
-    filePath.className = 'text-xs text-gray-500 truncate';
-    filePath.textContent = file.relative_path;
-    
-    const fileSize = document.createElement('div');
-    fileSize.className = 'text-xs text-gray-400';
-    fileSize.textContent = file.size_human;
-    
-    fileItem.appendChild(fileName);
-    fileItem.appendChild(filePath);
-    fileItem.appendChild(fileSize);
-    
-    // Add click handler to select file
-    fileItem.addEventListener('click', () => {
-      selectFile(index);
-    });
-    
-    fileList.appendChild(fileItem);
-  });
-}
-    
-    // Select a file from the list
-    async function selectFile(index) {
-      // Remove selected class from all items
-      document.querySelectorAll('.file-item').forEach(item => {
-        item.classList.remove('selected');
-      });
+      fileList.innerHTML = '';
+      fileCount.textContent = `${currentFiles.length} FLAC files`;
       
-      // Get file item
-      const fileItem = document.querySelector(`.file-item[data-index="${index}"]`);
-      if (fileItem) {
-        fileItem.classList.add('selected');
+      if (!currentFiles.length) {
+        const emptyMessage = document.createElement('div');
+        emptyMessage.className = 'p-4 text-gray-500 dark:text-gray-400 text-center';
+        emptyMessage.textContent = 'No FLAC files found in this directory';
+        fileList.appendChild(emptyMessage);
+        return;
       }
       
-      // Store selected file
-      selectedFile = currentFiles[index];
-      
-      // Show file details
-      showFileDetails(selectedFile);
-      
-      // Try to analyze the file to get metadata
-      await analyzeFile(selectedFile.path);
-    }
-    
-    // Show file details
-    function showFileDetails(file) {
-      // Display the details section
-      fileDetails.classList.remove('hidden');
-      
-      // Clear previous content
-      fileDetailsContent.innerHTML = '';
-      
-      // Basic file info
-      const details = document.createElement('div');
-      details.innerHTML = `
-        <div class="mb-2">
-          <span class="text-sm font-medium text-gray-500">Filename:</span>
-          <span class="ml-2 text-sm text-gray-900">${file.name}</span>
-        </div>
-        <div class="mb-2">
-          <span class="text-sm font-medium text-gray-500">Path:</span>
-          <span class="ml-2 text-sm text-gray-900">${file.relative_path}</span>
-        </div>
-        <div>
-          <span class="text-sm font-medium text-gray-500">Size:</span>
-          <span class="ml-2 text-sm text-gray-900">${file.size_human}</span>
-        </div>
-        <div class="mt-4" id="metadataSection">
-          <div class="text-center py-2 text-sm text-gray-500">
-            <svg class="animate-spin h-5 w-5 mx-auto text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p>Analyzing file metadata...</p>
-          </div>
-        </div>
-      `;
-      
-      fileDetailsContent.appendChild(details);
-    }
-    
-    // Analyze file to get metadata
-    async function analyzeFile(filePath) {
-      try {
-        // Make API call to get metadata
-        const response = await fetch(`http://localhost:8000/analyze_file?file_path=${encodeURIComponent(filePath)}`);
+      currentFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.dataset.index = index;
         
+        const contentContainer = document.createElement('div');
+        contentContainer.className = 'flex items-center relative';
+        
+        const coverArtContainer = document.createElement('div');
+        coverArtContainer.className = 'cover-art-container';
+        
+        const coverArtImg = document.createElement('img');
+        coverArtImg.alt = '';
+        coverArtImg.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cccccc"%3E%3Cpath d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"%3E%3C/path%3E%3C/svg%3E';
+        
+        coverArtContainer.appendChild(coverArtImg);
+        contentContainer.appendChild(coverArtContainer);
+        
+        const fileInfoContainer = document.createElement('div');
+        fileInfoContainer.className = 'file-info';
+        
+        const fileName = document.createElement('div');
+        fileName.className = 'font-medium text-gray-900 dark:text-gray-100 truncate';
+        fileName.textContent = file.name;
+        
+        const filePath = document.createElement('div');
+        filePath.className = 'text-xs text-gray-500 dark:text-gray-400 truncate';
+        filePath.textContent = file.relative_path;
+        
+        const fileSize = document.createElement('div');
+        fileSize.className = 'text-xs text-gray-400 dark:text-gray-500';
+        fileSize.textContent = file.size_human;
+        
+        fileInfoContainer.appendChild(fileName);
+        fileInfoContainer.appendChild(filePath);
+        fileInfoContainer.appendChild(fileSize);
+        
+        contentContainer.appendChild(fileInfoContainer);
+        
+        const menuButton = document.createElement('button');
+        menuButton.className = 'file-menu-trigger ml-2 p-1 rounded-full text-gray-400 hover:text-gray-500 dark:text-gray-500 dark:hover:text-gray-400 focus:outline-none';
+        menuButton.innerHTML = `
+          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+          </svg>
+        `;
+        
+        // Context menu trigger
+        menuButton.addEventListener('click', (e) => {
+          e.stopPropagation();
+          fileContextMenu.classList.add('hidden');
+          activeContextMenuFileIndex = index;
+          
+          const rect = menuButton.getBoundingClientRect();
+          fileContextMenu.style.top = `${rect.bottom + window.scrollY}px`;
+          fileContextMenu.style.left = `${rect.left + window.scrollX - 120}px`;
+          fileContextMenu.classList.remove('hidden');
+        });
+        
+        contentContainer.appendChild(menuButton);
+        fileItem.appendChild(contentContainer);
+        
+        // Show progress only if processing
+        const fileProgress = fileProgressMap[file.path] || { progress: 0, status: 'pending' };
+        if (isProcessing || fileProgress.progress > 0) {
+          const progressContainer = document.createElement('div');
+          progressContainer.className = 'progress-container mt-2';
+          
+          const progressBar = document.createElement('div');
+          progressBar.className = 'progress-bar';
+          progressBar.style.width = `${fileProgress.progress * 100}%`;
+          
+          progressContainer.appendChild(progressBar);
+          fileItem.appendChild(progressContainer);
+          
+          if (fileProgress.status !== 'pending') {
+            const statusLabel = document.createElement('div');
+            statusLabel.className = `text-xs mt-1 ${
+              fileProgress.status === 'completed' ? 'text-green-500 dark:text-green-400' : 
+              fileProgress.status === 'failed' ? 'text-red-500 dark:text-red-400' : 
+              'text-blue-500 dark:text-blue-400'
+            }`;
+            statusLabel.textContent = fileProgress.status.charAt(0).toUpperCase() + fileProgress.status.slice(1);
+            fileItem.appendChild(statusLabel);
+          }
+        }
+        
+        // Clicking a file item simply highlights it - no details panel
+        fileItem.addEventListener('click', () => {
+          // Remove selected class from all
+          document.querySelectorAll('.file-item').forEach(item => item.classList.remove('selected'));
+          fileItem.classList.add('selected');
+        });
+        
+        fileList.appendChild(fileItem);
+        
+        // Load cover art thumbnail if it exists
+        checkAndLoadCoverArt(file.path, coverArtImg);
+      });
+    }
+    
+    // Check and load cover art for a file
+    async function checkAndLoadCoverArt(filePath, imgElement) {
+      try {
+        const response = await fetch(`http://localhost:8000/analyze_file?file_path=${encodeURIComponent(filePath)}`);
         if (!response.ok) {
-          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+          throw new Error(`Server returned ${response.status}`);
         }
         
         const data = await response.json();
         
-        // Update UI with metadata
-        updateMetadataDisplay(data);
-      } catch (error) {
-        addLog(`Error analyzing file: ${error.message}`, 'error');
-        
-        // Show error in metadata section
-        const metadataSection = document.getElementById('metadataSection');
-        if (metadataSection) {
-          metadataSection.innerHTML = `
-            <div class="text-center py-2 text-sm text-red-500">
-              <p>Error analyzing file: ${error.message}</p>
-            </div>
-          `;
+        if (data.has_cover_art) {
+          imgElement.src = `http://localhost:8000/get_cover_art?file_path=${encodeURIComponent(filePath)}`;
+          imgElement.onerror = () => {
+            imgElement.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23cccccc"%3E%3Cpath d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6zm-2 16c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"%3E%3C/path%3E%3C/svg%3E';
+          };
         }
+      } catch (error) {
+        addLog(`Error loading cover art for ${filePath}: ${error.message}`, 'error');
       }
     }
     
-    // Update metadata display
-    function updateMetadataDisplay(metadata) {
-      const metadataSection = document.getElementById('metadataSection');
-      if (!metadataSection) return;
+    // Logging
+    function addLog(message, type = 'info') {
+      const logItem = document.createElement('div');
+      logItem.className = `log-item ${
+        type === 'error' 
+          ? 'log-error' 
+          : type === 'success' 
+          ? 'log-success' 
+          : 'log-info'
+      }`;
       
-      // Check if we have actual metadata
-      if (!metadata || Object.keys(metadata).length === 0) {
-        metadataSection.innerHTML = `
-          <div class="text-center py-2 text-sm text-gray-500">
-            <p>No metadata available</p>
+      const timestamp = document.createElement('span');
+      timestamp.className = 'text-gray-500 text-xs select-none';
+      timestamp.textContent = `[${new Date().toLocaleTimeString()}] `;
+      
+      logItem.appendChild(timestamp);
+      logItem.appendChild(document.createTextNode(message));
+      
+      logContainer.appendChild(logItem);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+    
+    // Cog loading
+    async function loadCogs() {
+      try {
+        cogsList.innerHTML = `
+          <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+            <svg class="animate-spin h-5 w-5 mx-auto text-blue-500 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Loading available processing components...
+          </div>
+        `;
+        
+        const response = await fetch('http://localhost:8000/cogs');
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        
+        allCogs = await response.json();
+        addLog(`Loaded ${allCogs.length} processing components`, 'info');
+        
+        renderCogList();
+        updateAvailableTags();
+      } catch (error) {
+        addLog(`Error loading cogs: ${error.message}`, 'error');
+        cogsList.innerHTML = `
+          <div class="p-4 text-center text-red-500 dark:text-red-400">
+            Error loading components: ${error.message}
+            <button id="retryLoadCogs" class="mt-2 text-blue-500 hover:underline">Retry</button>
+          </div>
+        `;
+        
+        document.getElementById('retryLoadCogs')?.addEventListener('click', loadCogs);
+      }
+    }
+    
+    // Render the list of cogs
+    function renderCogList() {
+      const searchTerm = cogSearch.value.toLowerCase();
+      const filterType = cogFilter.value;
+      
+      const filteredCogs = allCogs.filter(cog => {
+        const matchesSearch =
+          cog.name.toLowerCase().includes(searchTerm) ||
+          (cog.description && cog.description.toLowerCase().includes(searchTerm)) ||
+          cog.input_tags.some(tag => tag.toLowerCase().includes(searchTerm)) ||
+          cog.output_tags.some(tag => tag.toLowerCase().includes(searchTerm));
+        
+        const isSelected = selectedCogs.includes(cog.name);
+        const isAvailable = isCogAvailable(cog);
+        
+        if (filterType === 'selected' && !isSelected) return false;
+        if (filterType === 'available' && (!isAvailable || isSelected)) return false;
+        if (filterType === 'unavailable' && (isAvailable || isSelected)) return false;
+        
+        return matchesSearch;
+      });
+      
+      if (!filteredCogs.length) {
+        cogsList.innerHTML = `
+          <div class="p-4 text-center text-gray-500 dark:text-gray-400">
+            No components match your filters
           </div>
         `;
         return;
       }
       
-      // Create metadata table
-      let html = `
-        <h4 class="font-medium text-gray-700 mb-2">File Metadata</h4>
-        <div class="bg-white border border-gray-200 rounded overflow-hidden">
-      `;
+      cogsList.innerHTML = '';
       
-      // Extract key metadata
-      const title = metadata.title || 'Unknown Title';
-      const artist = metadata.artist || 'Unknown Artist';
-      const album = metadata.album || '';
-      const hasCoverArt = metadata.has_cover_art || false;
+      // Sort cogs by selected->available->unavailable, then by name
+      filteredCogs.sort((a, b) => {
+        const aSelected = selectedCogs.includes(a.name) ? 0 : 1;
+        const bSelected = selectedCogs.includes(b.name) ? 0 : 1;
+        
+        if (aSelected !== bSelected) return aSelected - bSelected;
+        
+        const aAvailable = isCogAvailable(a) ? 0 : 1;
+        const bAvailable = isCogAvailable(b) ? 0 : 1;
+        
+        if (aAvailable !== bAvailable) return aAvailable - bAvailable;
+        
+        return a.name.localeCompare(b.name);
+      });
       
-      // Show main metadata
-      html += `
-        <div class="p-3 border-b border-gray-200">
-          <div class="text-lg font-medium text-gray-900">${title}</div>
-          <div class="text-md text-gray-700">${artist}</div>
-          ${album ? `<div class="text-sm text-gray-500">${album}</div>` : ''}
-        </div>
-      `;
-      
-      // Show other metadata
-      html += `<div class="p-3 text-sm grid grid-cols-2 gap-2">`;
-      
-      // Show key-value pairs for other metadata
-      const excludeKeys = ['title', 'artist', 'album', 'has_cover_art'];
-      Object.entries(metadata)
-        .filter(([key]) => !excludeKeys.includes(key))
-        .forEach(([key, value]) => {
-          html += `
-            <div class="text-gray-500">${key}:</div>
-            <div class="text-gray-900 truncate">${value}</div>
-          `;
+      filteredCogs.forEach(cog => {
+        const isSelected = selectedCogs.includes(cog.name);
+        const isAvailable = isCogAvailable(cog);
+        
+        const cogItem = document.createElement('div');
+        cogItem.className = `p-3 ${
+          isSelected 
+            ? 'bg-blue-50 dark:bg-blue-900' 
+            : isAvailable 
+              ? 'bg-white dark:bg-gray-800' 
+              : 'bg-gray-50 dark:bg-gray-900'
+        }`;
+        
+        const cogHeader = document.createElement('div');
+        cogHeader.className = 'flex items-center justify-between';
+        
+        const cogName = document.createElement('div');
+        cogName.className = 'font-medium dark:text-gray-100';
+        cogName.textContent = cog.name;
+        
+        const selectionControl = document.createElement('div');
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `cog-${cog.name}`;
+        checkbox.className = 'h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 rounded';
+        checkbox.checked = isSelected;
+        checkbox.disabled = !isSelected && !isAvailable;
+        
+        checkbox.addEventListener('change', () => {
+          if (checkbox.checked) {
+            selectedCogs.push(cog.name);
+          } else {
+            selectedCogs = selectedCogs.filter(name => name !== cog.name);
+          }
+          updateAvailableTags();
+          renderCogList();
+          updateSelectedCogsSummary();
         });
-      
-      html += `</div>`;
-      
-      // Add cover art info
-      html += `
-        <div class="p-3 border-t border-gray-200 flex items-center ${hasCoverArt ? 'text-green-600' : 'text-gray-500'}">
-          <svg class="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${hasCoverArt ? 'M5 13l4 4L19 7' : 'M6 18L18 6M6 6l12 12'}"></path>
-          </svg>
-          <span>${hasCoverArt ? 'Has cover art' : 'No cover art'}</span>
-        </div>
-      `;
-      
-      html += `</div>`;
-      
-      metadataSection.innerHTML = html;
+        
+        selectionControl.appendChild(checkbox);
+        
+        cogHeader.appendChild(cogName);
+        cogHeader.appendChild(selectionControl);
+        cogItem.appendChild(cogHeader);
+        
+        if (cog.description) {
+          const description = document.createElement('div');
+          description.className = 'text-sm text-gray-600 dark:text-gray-400 mt-1';
+          description.textContent = cog.description;
+          cogItem.appendChild(description);
+        }
+        
+        // Tags
+        const tagsSection = document.createElement('div');
+        tagsSection.className = 'mt-2 text-xs';
+        
+        if (cog.input_tags.length > 0) {
+          const inputTagsRow = document.createElement('div');
+          inputTagsRow.className = 'flex flex-wrap items-center gap-1 mb-1';
+          
+          const inputLabel = document.createElement('span');
+          inputLabel.className = 'text-gray-500 dark:text-gray-400 mr-1';
+          inputLabel.textContent = 'Inputs:';
+          inputTagsRow.appendChild(inputLabel);
+          
+          cog.input_tags.forEach(tag => {
+            const tagSpan = document.createElement('span');
+            const isAvailableInput = availableOutputTagsSet.has(tag);
+            tagSpan.className = `inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+              isAvailableInput 
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' 
+                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+            }`;
+            tagSpan.textContent = tag;
+            inputTagsRow.appendChild(tagSpan);
+          });
+          
+          tagsSection.appendChild(inputTagsRow);
+        } else {
+          const noInputsMsg = document.createElement('div');
+          noInputsMsg.className = 'text-green-600 dark:text-green-400 mb-1';
+          noInputsMsg.textContent = 'No input requirements';
+          tagsSection.appendChild(noInputsMsg);
+        }
+        
+        if (cog.output_tags.length > 0) {
+          const outputTagsRow = document.createElement('div');
+          outputTagsRow.className = 'flex flex-wrap items-center gap-1';
+          
+          const outputLabel = document.createElement('span');
+          outputLabel.className = 'text-gray-500 dark:text-gray-400 mr-1';
+          outputLabel.textContent = 'Outputs:';
+          outputTagsRow.appendChild(outputLabel);
+          
+          cog.output_tags.forEach(tag => {
+            const tagSpan = document.createElement('span');
+            tagSpan.className = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+            tagSpan.textContent = tag;
+            outputTagsRow.appendChild(tagSpan);
+          });
+          
+          tagsSection.appendChild(outputTagsRow);
+        }
+        
+        cogItem.appendChild(tagsSection);
+        
+        // If currently unavailable
+        if (!isSelected && !isAvailable) {
+          const unavailableMsg = document.createElement('div');
+          unavailableMsg.className = 'mt-2 text-xs text-red-500 dark:text-red-400';
+          unavailableMsg.textContent = 'Required inputs not available';
+          cogItem.appendChild(unavailableMsg);
+        }
+        
+        cogsList.appendChild(cogItem);
+      });
     }
     
-    // Button handlers
+    // Check if a cog is currently available based on selected cogs
+    function isCogAvailable(cog) {
+      if (!cog.input_tags.length) return true;
+      return cog.input_tags.every(tag => availableOutputTagsSet.has(tag));
+    }
+    
+    // Update available tags based on selected cogs
+    function updateAvailableTags() {
+      availableInputTagsSet = new Set();
+      availableOutputTagsSet = new Set();
+      
+      selectedCogs.forEach(cogName => {
+        const cog = allCogs.find(c => c.name === cogName);
+        if (cog) {
+          cog.input_tags.forEach(tag => availableInputTagsSet.add(tag));
+          cog.output_tags.forEach(tag => availableOutputTagsSet.add(tag));
+        }
+      });
+      
+      renderAvailableTags();
+    }
+    
+    function renderAvailableTags() {
+      availableInputTags.innerHTML = '';
+      availableOutputTags.innerHTML = '';
+      
+      if (!availableInputTagsSet.size) {
+        const noneInput = document.createElement('span');
+        noneInput.className = 'text-gray-400 dark:text-gray-500 text-xs';
+        noneInput.textContent = 'None';
+        availableInputTags.appendChild(noneInput);
+      } else {
+        Array.from(availableInputTagsSet).sort().forEach(tag => {
+          const tagSpan = document.createElement('span');
+          tagSpan.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+          tagSpan.textContent = tag;
+          availableInputTags.appendChild(tagSpan);
+        });
+      }
+      
+      if (!availableOutputTagsSet.size) {
+        const noneOutput = document.createElement('span');
+        noneOutput.className = 'text-gray-400 dark:text-gray-500 text-xs';
+        noneOutput.textContent = 'None';
+        availableOutputTags.appendChild(noneOutput);
+      } else {
+        Array.from(availableOutputTagsSet).sort().forEach(tag => {
+          const tagSpan = document.createElement('span');
+          tagSpan.className = 'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+          tagSpan.textContent = tag;
+          availableOutputTags.appendChild(tagSpan);
+        });
+      }
+    }
+    
+    function updateSelectedCogsSummary() {
+      if (!selectedCogs.length) {
+        selectedCogsSummary.innerHTML = '<p>No cogs selected. Select processing components below.</p>';
+        return;
+      }
+      
+      const selectedCogObjects = selectedCogs.map(name =>
+        allCogs.find(cog => cog.name === name)
+      ).filter(Boolean);
+      
+      selectedCogsSummary.innerHTML = `
+        <p class="mb-1">Processing order (${selectedCogObjects.length}):</p>
+        <ol class="list-decimal pl-5">
+          ${selectedCogObjects.map(cog => `<li>${cog.name}</li>`).join('')}
+        </ol>
+      `;
+    }
+    
+    // Reset cog selection
+    function resetCogSelection() {
+      selectedCogs = [];
+      updateAvailableTags();
+      renderCogList();
+      updateSelectedCogsSummary();
+      addLog('Cog selection reset', 'info');
+    }
+    
+    // Select directories
     selectInputButton.addEventListener('click', async () => {
       try {
         const paths = await window.api.selectDirectory();
@@ -489,7 +1245,6 @@
           addLog(`Selected input directory: ${paths[0]}`, 'info');
           updateProcessButton();
           
-          // Load files from this directory
           await loadFilesFromDirectory(paths[0]);
         }
       } catch (error) {
@@ -510,6 +1265,7 @@
       }
     });
     
+    // Main processing
     processButton.addEventListener('click', async () => {
       if (!inputPathField.value || !outputPathField.value || !apiConnected || isProcessing) {
         return;
@@ -519,24 +1275,40 @@
         setProcessing(true);
         addLog('Starting processing...', 'info');
         
+        updateOverallProgress(0);
+        
+        // Reset progress
+        for (const filePath in fileProgressMap) {
+          fileProgressMap[filePath].progress = 0;
+          fileProgressMap[filePath].status = 'pending';
+        }
+        renderFileList();
+        
+        // Prepare request
+        const requestBody = {
+          input_path: inputPathField.value,
+          output_path: outputPathField.value,
+          force_update: forceUpdateCheckbox.checked,
+          lyrics_source: 'genius',
+          selected_cogs: selectedCogs.join(',')
+        };
+        
+        if (selectedCogs.length) {
+          addLog(`Using selected cogs: ${selectedCogs.join(', ')}`, 'info');
+        } else {
+          addLog('Using default processing pipeline', 'info');
+        }
+        
         const response = await fetch('http://localhost:8000/process_directory', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            input_path: inputPathField.value,
-            output_path: outputPathField.value,
-            force_update: forceUpdateCheckbox.checked,
-            lyrics_source: 'genius'
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
         });
         
         const data = await response.json();
         
         if (data.job_id) {
           addLog(`Processing job started: ${data.job_id}`, 'success');
-          // Poll for job status
           pollJobStatus(data.job_id);
         } else {
           addLog('Failed to start processing job', 'error');
@@ -548,14 +1320,22 @@
       }
     });
     
+    // Check API connection
     checkApiButton.addEventListener('click', checkApiConnection);
     
+    // Clear logs
     clearLogsButton.addEventListener('click', () => {
       logContainer.innerHTML = '';
       addLog('Logs cleared', 'info');
     });
     
-    // Helper functions
+    // Cog event listeners
+    cogSearch.addEventListener('input', renderCogList);
+    cogFilter.addEventListener('change', renderCogList);
+    refreshCogsButton.addEventListener('click', loadCogs);
+    resetCogsButton.addEventListener('click', resetCogSelection);
+    
+    // API connection check
     async function checkApiConnection() {
       try {
         addLog('Checking Python API connection...', 'info');
@@ -568,6 +1348,10 @@
         updateApiStatus('connected');
         apiConnected = true;
         updateProcessButton();
+        
+        if (!allCogs.length) {
+          loadCogs();
+        }
       } catch (error) {
         addLog(`API connection failed: ${error.message}`, 'error');
         updateApiStatus('error');
@@ -578,17 +1362,18 @@
     
     function updateApiStatus(status) {
       if (status === 'connected') {
-        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800';
+        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100';
         apiStatus.textContent = 'API Status: Connected';
       } else if (status === 'error') {
-        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800';
+        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100';
         apiStatus.textContent = 'API Status: Error';
       } else {
-        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800';
+        apiStatus.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100';
         apiStatus.textContent = 'API Status: Checking...';
       }
     }
     
+    // Set processing state
     function setProcessing(processing) {
       isProcessing = processing;
       
@@ -600,16 +1385,22 @@
           </svg>
           Processing...
         `;
+        overallProgressContainer.classList.remove('hidden');
+        overallProgressContainer.classList.add('block');
       } else {
         processButton.textContent = 'Process Files';
+        setTimeout(() => {
+          overallProgressContainer.classList.add('hidden');
+          overallProgressContainer.classList.remove('block');
+        }, 3000);
       }
       
       updateProcessButton();
     }
     
+    // Update "Process Files" button state
     function updateProcessButton() {
       const canProcess = inputPathField.value && outputPathField.value && apiConnected && !isProcessing;
-      
       if (canProcess) {
         processButton.disabled = false;
         processButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -619,15 +1410,23 @@
       }
     }
     
+    // Poll the server for job status
     async function pollJobStatus(jobId) {
       const interval = setInterval(async () => {
         try {
           const response = await fetch(`http://localhost:8000/status/${jobId}`);
           const data = await response.json();
           
-          // Update progress info
-          const progress = Math.round(data.progress * 100);
-          addLog(`Job ${jobId}: ${data.status} (${progress}%)`, 'info');
+          updateOverallProgress(data.progress);
+          const percentage = Math.round(data.progress * 100);
+          addLog(`Job ${jobId}: ${data.status} (${percentage}%)`, 'info');
+          
+          if (data.file_progress && Object.keys(data.file_progress).length) {
+            for (const filePath in data.file_progress) {
+              const fileData = data.file_progress[filePath];
+              updateFileProgress(filePath, fileData.progress, fileData.status);
+            }
+          }
           
           if (data.status === 'completed' || data.status === 'failed') {
             clearInterval(interval);
@@ -637,10 +1436,29 @@
               if (data.result && data.result.output_dir) {
                 addLog(`Output directory: ${data.result.output_dir}`, 'success');
               }
+              
+              // Set remaining pending files to completed
+              for (const filePath in fileProgressMap) {
+                if (fileProgressMap[filePath].status !== 'failed') {
+                  fileProgressMap[filePath].progress = 1;
+                  fileProgressMap[filePath].status = 'completed';
+                }
+              }
+              
+              if (data.result && data.result.cogs_used) {
+                addLog(`Processing pipeline used: ${data.result.cogs_used.join(', ')}`, 'info');
+              }
             } else {
               addLog(`Job ${jobId} failed: ${data.error || 'Unknown error'}`, 'error');
+              
+              for (const filePath in fileProgressMap) {
+                if (fileProgressMap[filePath].status === 'pending') {
+                  fileProgressMap[filePath].status = 'failed';
+                }
+              }
             }
             
+            renderFileList();
             setProcessing(false);
           }
         } catch (error) {
@@ -649,6 +1467,26 @@
           setProcessing(false);
         }
       }, 1000);
+    }
+    
+    // Update individual file progress
+    function updateFileProgress(filePath, progress, status) {
+      if (fileProgressMap[filePath]) {
+        fileProgressMap[filePath].progress = progress;
+        fileProgressMap[filePath].status = status;
+        renderFileList();
+      }
+    }
+    
+    // Update overall progress
+    function updateOverallProgress(progress) {
+      if (!overallProgressContainer.classList.contains('block')) {
+        overallProgressContainer.classList.remove('hidden');
+        overallProgressContainer.classList.add('block');
+      }
+      const percentage = Math.round(progress * 100);
+      overallProgressBar.style.width = `${percentage}%`;
+      overallProgressText.textContent = `${percentage}%`;
     }
   </script>
 </body>
