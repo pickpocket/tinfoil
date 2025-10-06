@@ -80,7 +80,7 @@ class CogRegistry:
         required_outputs: List[str],
         include_cogs: Optional[List[str]] = None,
         exclude_cogs: Optional[List[str]] = None
-    ) -> List[BaseCog]:
+    ) -> List[str]:
         if not self.loaded:
             self.load_cogs()
         
@@ -176,32 +176,7 @@ class CogRegistry:
             if cog not in visited:
                 visit(cog)
         
-        instantiated_cogs = []
-        for cog_class in reversed(sorted_cogs):
-            if cog_class.__name__ == "AcoustIDCog":
-                self.logger.warning("AcoustIDCog requires api_key and fpcalc_path parameters")
-            else:
-                instantiated_cogs.append(cog_class(logger=self.logger))
+        sorted_cog_names = [cog.__name__ for cog in reversed(sorted_cogs)]
+        self.logger.info(f"Built pipeline with {len(sorted_cog_names)} cogs: {sorted_cog_names}")
         
-        self.logger.info(f"Built pipeline with {len(instantiated_cogs)} cogs: {[c.__class__.__name__ for c in instantiated_cogs]}")
-        
-        return instantiated_cogs
-
-def build_pipeline(registry: CogRegistry, selected_cogs: List[str]) -> List[BaseCog]:
-    logger = logging.getLogger(__name__)
-    
-    if not registry.loaded:
-        registry.load_cogs()
-    
-    pipeline_cogs = []
-    for name in selected_cogs:
-        cog_class = registry.get_cog_by_name(name)
-        if cog_class:
-            if cog_class.__name__ == "AcoustIDCog":
-                logger.warning(f"Skipping {name}, requires special parameters")
-            else:
-                pipeline_cogs.append(cog_class(logger=logger))
-        else:
-            logger.error(f"Cog not found: {name}")
-    
-    return pipeline_cogs
+        return sorted_cog_names

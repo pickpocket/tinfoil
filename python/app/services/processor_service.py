@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import logging
 import tempfile
 import shutil
@@ -13,7 +13,9 @@ from app.services.job_service import JobService
 import sys
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from processor import TinfoilProcessor
-from cog_loader import CogRegistry, build_pipeline
+from cog_loader import CogRegistry
+from base_cog import BaseCog
+from cogs.tag_based_match_cog import TagBasedMatchCog
 
 class ProcessorService:
     def __init__(self, settings: Settings, logger: logging.Logger, job_service: JobService):
@@ -38,6 +40,47 @@ class ProcessorService:
             return False
         return True
     
+    def _build_cog_pipeline(self, selected_cogs: Optional[List[str]] = None) -> List[BaseCog]:
+        cog_registry = CogRegistry(logger=self.logger)
+        cog_registry.load_cogs()
+
+        pipeline = []
+        
+        cog_names_to_load = selected_cogs
+        if not cog_names_to_load:
+            cog_names_to_load = [
+                'AcoustIDCog',
+                'TagBasedMatchCog',
+                'MusicBrainzCog',
+                'CoverArtCog',
+                'LrclibLyricsCog',
+                'NeteaseLyricsCog',
+                'GeniusLyricsCog'
+            ]
+            self.logger.info("No cogs selected, using default pipeline.")
+
+        self.logger.info(f"Building pipeline with cogs: {cog_names_to_load}")
+        for cog_name in cog_names_to_load:
+            cog_class = cog_registry.get_cog_by_name(cog_name)
+            if not cog_class:
+                self.logger.warning(f"Cog '{cog_name}' not found, skipping.")
+                continue
+
+            try:
+                if cog_name == 'AcoustIDCog':
+                    instance = cog_class(
+                        api_key=self.settings.ACOUSTID_API_KEY,
+                        fpcalc_path=self.settings.get_fpcalc_path(),
+                        logger=self.logger
+                    )
+                else:
+                    instance = cog_class(logger=self.logger)
+                pipeline.append(instance)
+            except Exception as e:
+                self.logger.error(f"Failed to instantiate cog '{cog_name}': {e}")
+        
+        return pipeline
+
     def create_job(self, input_path: Optional[str] = None, output_path: Optional[str] = None, options: Optional[Dict[str, Any]] = None) -> str:
         if input_path and not self._validate_file_path(input_path):
             raise ValidationError("Invalid input path")
@@ -79,18 +122,16 @@ class ProcessorService:
         output_pattern = options.get('output_pattern') or self.settings.DEFAULT_OUTPUT_PATTERN
         selected_cogs = options.get('selected_cogs')
         
+        pipeline = self._build_cog_pipeline(selected_cogs)
+        if not pipeline:
+            self.job_service.update_file_progress(job_id, str_path, 1.0, "failed", "Could not build processing pipeline.")
+            return False
+
         processor = TinfoilProcessor(
-            api_key=self.settings.ACOUSTID_API_KEY,
-            fpcalc_path=self.settings.get_fpcalc_path(),
+            pipeline=pipeline,
             output_pattern=output_pattern,
             logger=self.logger
         )
-        
-        if selected_cogs:
-            cog_registry = CogRegistry(logger=self.logger)
-            custom_cogs = build_pipeline(cog_registry, selected_cogs)
-            if custom_cogs:
-                processor.cogs = custom_cogs
         
         self.job_service.update_file_progress(job_id, str_path, 0.3, "processing")
         
@@ -126,22 +167,20 @@ class ProcessorService:
         selected_cogs = options.get('selected_cogs')
         tag_fallback = options.get('tag_fallback', True)
         
+        pipeline = self._build_cog_pipeline(selected_cogs)
+        if not pipeline:
+            self.job_service.set_job_error(job_id, "Could not build processing pipeline.")
+            return
+
+        if not tag_fallback:
+            pipeline = [cog for cog in pipeline if not isinstance(cog, TagBasedMatchCog)]
+            self.logger.info("Tag-based fallback matching is disabled.")
+
         processor = TinfoilProcessor(
-            api_key=self.settings.ACOUSTID_API_KEY,
-            fpcalc_path=self.settings.get_fpcalc_path(),
+            pipeline=pipeline,
             output_pattern=output_pattern,
             logger=self.logger
         )
-        
-        if not tag_fallback:
-            processor.cogs = [cog for cog in processor.cogs 
-                             if cog.__class__.__name__ != 'TagBasedMatchCog']
-        
-        if selected_cogs:
-            cog_registry = CogRegistry(logger=self.logger)
-            custom_cogs = build_pipeline(cog_registry, selected_cogs)
-            if custom_cogs:
-                processor.cogs = custom_cogs
         
         self.job_service.update_job_progress(job_id, 0.2, "processing")
         

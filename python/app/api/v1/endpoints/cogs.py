@@ -41,11 +41,10 @@ async def build_pipeline(required_outputs: list[str], include_cogs: list[str] = 
         raise HTTPException(status_code=400, detail="Too many cogs to exclude")
     
     cog_registry = CogRegistry()
-    pipeline = cog_registry.build_pipeline_for_outputs(
+    pipeline_names = cog_registry.build_pipeline_for_outputs(
         required_outputs,
         include_cogs=include_cogs,
         exclude_cogs=exclude_cogs
     )
     
-    pipeline_names = [cog.__class__.__name__ for cog in pipeline]
     return {"pipeline": pipeline_names}
