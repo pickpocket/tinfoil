@@ -8,7 +8,6 @@ from typing import Optional, Dict, Any
 
 from base_cog import BaseCog
 from song import Song
-from config import Config
 
 
 class NeteaseLyricsCog(BaseCog):
@@ -27,6 +26,7 @@ class NeteaseLyricsCog(BaseCog):
             logger: Logger instance
         """
         super().__init__(logger)
+        self.user_agent = "tinfoil/1.0"
     
     def process(self, song: Song) -> bool:
         """Process lyrics for a song.
@@ -91,7 +91,7 @@ class NeteaseLyricsCog(BaseCog):
             self.logger.debug(f"NetEase search URL: {netease_url}")
             
             # Set user agent to avoid blocking
-            headers = {'User-Agent': Config.USER_AGENT}
+            headers = {'User-Agent': self.user_agent}
             netease_response = requests.get(netease_url, headers=headers, timeout=10)
             
             if netease_response.status_code == 200:
@@ -132,7 +132,7 @@ class NeteaseLyricsCog(BaseCog):
         """
         try:
             lyric_url = f"https://music.163.com/api/song/lyric?id={song_id}&kv=-1&lv=-1"
-            headers = {'User-Agent': Config.USER_AGENT}
+            headers = {'User-Agent': self.user_agent}
             
             self.logger.debug(f"NetEase lyrics URL: {lyric_url}")
             lyric_response = requests.get(lyric_url, headers=headers, timeout=10)

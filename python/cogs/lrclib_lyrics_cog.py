@@ -8,7 +8,6 @@ from typing import Optional, Dict, Any
 
 from base_cog import BaseCog
 from song import Song
-from config import Config
 
 
 class LrclibLyricsCog(BaseCog):

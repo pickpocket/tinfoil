@@ -9,7 +9,6 @@ from typing import Optional, Dict, Any, List, Tuple
 
 from base_cog import BaseCog
 from song import Song
-from config import Config
 
 
 class TagBasedMatchCog(BaseCog):
@@ -42,11 +41,11 @@ class TagBasedMatchCog(BaseCog):
         """
         super().__init__(logger)
         
-        # Initialize MusicBrainz API
+        # Initialize MusicBrainz API with hardcoded values
         musicbrainzngs.set_useragent(
-            Config.MB_APP_NAME,
-            Config.MB_VERSION,
-            Config.MB_CONTACT
+            "tinfoil",
+            "1.0",
+            "imsoupp@protonmail.com"
         )
         musicbrainzngs.set_format("json")
     

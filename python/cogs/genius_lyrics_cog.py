@@ -13,7 +13,6 @@ import urllib.parse
 
 from base_cog import BaseCog
 from song import Song
-from config import Config
 
 
 class GeniusLyricsCog(BaseCog):
