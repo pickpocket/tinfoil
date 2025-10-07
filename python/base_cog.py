@@ -7,6 +7,10 @@ class BaseCog(ABC):
     input_tags: List[str] = []
     output_tags: List[str] = []
     
+    # New class attribute to declare required settings.
+    # Each setting is a dictionary defining its name, a user-friendly label, and its type.
+    required_settings: List[Dict[str, str]] = []
+    
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger if logger else logging.getLogger(self.__class__.__name__)
     

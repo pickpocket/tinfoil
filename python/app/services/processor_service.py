@@ -67,14 +67,31 @@ class ProcessorService:
                 continue
 
             try:
+                # Build the arguments for the cog's constructor
+                init_kwargs = {'logger': self.logger}
+                is_configurable = True
+                
+                required_settings = getattr(cog_class, 'required_settings', [])
+                for setting in required_settings:
+                    key_name = setting['name']
+                    config_name = key_name.upper() # e.g., 'acoustid_api_key' -> 'ACOUSTID_API_KEY'
+                    
+                    if hasattr(self.settings, config_name) and getattr(self.settings, config_name):
+                        init_kwargs[key_name] = getattr(self.settings, config_name)
+                    else:
+                        self.logger.warning(f"Required setting '{config_name}' not configured for cog '{cog_name}'. Skipping.")
+                        is_configurable = False
+                        break # Stop if any required setting is missing
+                
+                if not is_configurable:
+                    continue
+
+                # Special handling for fpcalc_path which isn't a user-set API key
                 if cog_name == 'AcoustIDCog':
-                    instance = cog_class(
-                        api_key=self.settings.ACOUSTID_API_KEY,
-                        fpcalc_path=self.settings.get_fpcalc_path(),
-                        logger=self.logger
-                    )
-                else:
-                    instance = cog_class(logger=self.logger)
+                    init_kwargs['fpcalc_path'] = self.settings.get_fpcalc_path()
+
+                # Instantiate the cog with the dynamically built arguments
+                instance = cog_class(**init_kwargs)
                 pipeline.append(instance)
             except Exception as e:
                 self.logger.error(f"Failed to instantiate cog '{cog_name}': {e}")

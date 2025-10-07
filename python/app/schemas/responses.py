@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 class FileProgress(BaseModel):
@@ -17,11 +17,18 @@ class JobStatusResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+class CogSettingInfo(BaseModel):
+    name: str
+    label: str
+    type: str = "text"
+    is_configured: bool
+
 class CogInfo(BaseModel):
     name: str
     input_tags: list[str]
     output_tags: list[str]
     description: Optional[str] = None
+    settings: List[CogSettingInfo] = []
 
 class SystemInfo(BaseModel):
     fpcalc_installed: bool

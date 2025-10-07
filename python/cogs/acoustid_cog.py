@@ -14,8 +14,22 @@ class AcoustIDCog(BaseCog):
         'acoustid_id'
     ]
     
+    # Declare the required setting for this cog.
+    # 'name' is the internal config key.
+    # 'label' is for the UI.
+    # 'type': 'password' will tell the UI to treat it like a secret.
+    required_settings = [
+        {
+            'name': 'acoustid_api_key',
+            'label': 'AcoustID API Key',
+            'type': 'password'
+        }
+    ]
+    
     def __init__(self, api_key: str, fpcalc_path: Optional[str] = None, logger: Optional[logging.Logger] = None):
         super().__init__(logger)
+        if not api_key:
+            raise ValueError("AcoustID API key is required for AcoustIDCog.")
         self.api_key = api_key
         self.user_agent = "tinfoil/1.0"
         self.acoustid_api_url = "https://api.acoustid.org/v2/lookup"
@@ -144,3 +158,4 @@ class AcoustIDCog(BaseCog):
         
         self.logger.warning(f"Invalid AcoustID API key: {data.get('status')}")
         return False
+

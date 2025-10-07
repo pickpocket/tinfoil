@@ -31,7 +31,6 @@ class ProcessDirectoryRequest(BaseModel):
     force_update: bool = False
     output_pattern: Optional[str] = None
     tag_fallback: bool = True
-    api_key: Optional[str] = Field(default=None, max_length=100)
     selected_cogs: Optional[list[str]] = Field(default=None, max_items=50)
     
     @validator('input_path', 'output_path')
