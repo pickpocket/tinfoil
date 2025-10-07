@@ -33,7 +33,6 @@ class CogInfo(BaseModel):
 class SystemInfo(BaseModel):
     fpcalc_installed: bool
     fpcalc_path: Optional[str]
-    acoustid_key_configured: bool
     app_dir: str
     log_dir: str
     default_output_dir: str

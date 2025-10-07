@@ -1,11 +1,14 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Body
 import sys
 from pathlib import Path
+import json
+import re
+from typing import Dict, Any
 
 sys.path.append(str(Path(__file__).parent.parent.parent.parent.parent))
 from cog_loader import CogRegistry
 from app.schemas.responses import CogInfo, CogSettingInfo
-from app.core.config import get_settings
+from app.core.config import get_settings, Settings
 
 router = APIRouter(prefix="/cogs", tags=["cogs"])
 
@@ -66,3 +69,69 @@ async def build_pipeline(required_outputs: list[str], include_cogs: list[str] = 
     )
     
     return {"pipeline": pipeline_names}
+
+def sanitize_cog_name(name: str) -> str:
+    """Sanitizes a cog name to be used as a filename."""
+    if not isinstance(name, str):
+        return ""
+    # Allow alphanumeric characters, removing potential path traversal or invalid chars
+    return "".join(re.findall(r'[\w]', name))
+
+@router.post("/{cog_name}/settings")
+async def save_cog_settings(
+    cog_name: str,
+    settings_data: Dict[str, Any] = Body(...),
+    settings: Settings = Depends(get_settings)
+):
+    """Saves settings for a specific cog to a JSON file."""
+    sanitized_name = sanitize_cog_name(cog_name)
+    if not sanitized_name:
+        raise HTTPException(status_code=400, detail="Invalid cog name provided.")
+
+    # Validate that the cog actually exists
+    cog_registry = CogRegistry()
+    if cog_name not in cog_registry.get_all_cogs():
+        raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found.")
+
+    settings_dir = settings.get_cog_settings_dir()
+    settings_file = settings_dir / f"{sanitized_name}.json"
+
+    try:
+        with open(settings_file, 'w', encoding='utf-8') as f:
+            json.dump(settings_data, f, indent=4)
+        return {"status": "success", "message": f"Settings for '{cog_name}' saved successfully."}
+    except Exception as e:
+        # Log the exception
+        raise HTTPException(status_code=500, detail=f"An error occurred while saving settings: {str(e)}")
+
+
+@router.get("/{cog_name}/settings", response_model=Dict[str, Any])
+async def get_cog_settings(
+    cog_name: str,
+    settings: Settings = Depends(get_settings)
+):
+    """Retrieves settings for a specific cog from its JSON file."""
+    sanitized_name = sanitize_cog_name(cog_name)
+    if not sanitized_name:
+        raise HTTPException(status_code=400, detail="Invalid cog name provided.")
+
+    # Validate that the cog actually exists
+    cog_registry = CogRegistry()
+    if cog_name not in cog_registry.get_all_cogs():
+        raise HTTPException(status_code=404, detail=f"Cog '{cog_name}' not found.")
+
+    settings_dir = settings.get_cog_settings_dir()
+    settings_file = settings_dir / f"{sanitized_name}.json"
+
+    if not settings_file.exists():
+        # It's not an error if settings don't exist yet, just return empty
+        return {}
+
+    try:
+        with open(settings_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Error decoding settings file.")
+    except Exception as e:
+        # Log the exception
+        raise HTTPException(status_code=500, detail=f"An error occurred while reading settings: {str(e)}")
