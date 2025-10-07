@@ -76,10 +76,6 @@ function startPythonBackend() {
         return;
     }
 
-    // ... (the rest of the function remains the same)
-    // pythonProcess.stdout.on(...);
-    // pythonProcess.stderr.on(...);
-    // etc.
 }
 function validatePath(filePath) {
     if (typeof filePath !== 'string') return false;
