@@ -59,6 +59,12 @@ class Settings(BaseSettings):
             log_dir.mkdir(exist_ok=True)
         return log_dir
     
+    def get_cog_settings_dir(self) -> Path:
+        settings_dir = self.get_app_dir() / 'cog_settings'
+        if not settings_dir.exists():
+            settings_dir.mkdir(parents=True, exist_ok=True)
+        return settings_dir
+    
     def get_fpcalc_path(self) -> str | None:
         if self.FPCALC_PATH and os.path.isfile(self.FPCALC_PATH):
             return self.FPCALC_PATH
