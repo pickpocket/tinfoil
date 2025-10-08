@@ -26,15 +26,6 @@ class Settings(BaseSettings):
     MAX_FILENAME_LENGTH: int = 250
     MAX_UPLOAD_SIZE: int = 100 * 1024 * 1024
     
-    USER_AGENT: str = "tinfoil/1.0"
-    MB_APP_NAME: str = "tinfoil"
-    MB_VERSION: str = "1.0"
-    MB_CONTACT: str = "imsoupp@protonmail.com"
-    
-    ACOUSTID_API_URL: str = "https://api.acoustid.org/v2/lookup"
-    MUSICBRAINZ_API_URL: str = "https://musicbrainz.org/ws/2/"
-    COVERART_API_URL: str = "https://coverartarchive.org"
-    
     class Config:
         env_file = ".env"
         case_sensitive = True
